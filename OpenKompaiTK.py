@@ -94,8 +94,8 @@ class Speaker:
         self._is_busy = False
         self.is_available = False
         # CORRECCIÓN: Usar las rutas absolutas y exactas proporcionadas por el usuario.
-        self.piper_bin = '/home/user/piper/install/piper'
-        self.piper_model = '/home/user/piper/voices/es_ES/es_ES-davefx-medium.onnx'
+        self.piper_bin = 'piper/install/piper'
+        self.piper_model = 'piper/voices/es_ES/es_ES-davefx-medium.onnx'
 
         # --- Comprobación detallada de los ficheros de Piper ---
         piper_ok = os.path.isfile(self.piper_bin)
