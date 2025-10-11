@@ -1,0 +1,24 @@
+{
+  "frases": [
+    {
+      "texto": "La imaginación es más importante que el conocimiento.",
+      "autor": "Albert Einstein"
+    },
+    {
+      "texto": "El único modo de hacer un gran trabajo es amar lo que haces.",
+      "autor": "Steve Jobs"
+    },
+    {
+      "texto": "No cuentes los días, haz que los días cuenten.",
+      "autor": "Muhammad Ali"
+    },
+    {
+      "texto": "El éxito es la suma de pequeños esfuerzos repetidos día tras día.",
+      "autor": "Robert Collier"
+    },
+    {
+      "texto": "La vida es un 10% lo que te ocurre y un 90% cómo reaccionas a ello.",
+      "autor": "Charles R. Swindoll"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "emisoras": [
+    {
+      "nombre": "radio nacional",
+      "url": "http://rtve-live.hls.adaptive.level3.net/rtve/live/hls/rne_rne/index.m3u8"
+    },
+    {
+      "nombre": "cadena ser",
+      "url": "http://live-radio-online.net/cadena-ser"
+    },
+    {
+      "nombre": "radio galega",
+      "url": "http://crtvg.stream.flumotion.com/crtvg/radio-galega.mp3.m3u"
+    }
+  ]
+}

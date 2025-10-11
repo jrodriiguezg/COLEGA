@@ -1,0 +1,16 @@
+[
+    {
+        "time": "08:30:00",
+        "days_of_week": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+        ],
+        "label": "Despertador",
+        "last_triggered_date": null
+    }
+]
