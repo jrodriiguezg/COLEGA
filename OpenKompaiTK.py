@@ -8,6 +8,7 @@ import logging
 import locale
 import json
 import random
+import socket
 import subprocess
 from datetime import datetime, date, timedelta
 
@@ -33,6 +34,12 @@ try:
 except ImportError:
     Image = ImageTk = None
     psutil = None
+# --- NUEVO: Librería para reconocimiento de voz robusto ---
+try:
+    from thefuzz import fuzz
+    THEFUZZ_DISPONIBLE = True
+except ImportError:
+    THEFUZZ_DISPONIBLE = False
 
 from pill_manager import PillManager
 from modules.safety_manager import SafetyManager
@@ -94,8 +101,8 @@ class Speaker:
         self._is_busy = False
         self.is_available = False
         # CORRECCIÓN: Usar las rutas absolutas y exactas proporcionadas por el usuario.
-        self.piper_bin = 'piper/install/piper'
-        self.piper_model = 'piper/voices/es_ES/es_ES-davefx-medium.onnx'
+        self.piper_bin = '/home/user/piper/install/piper'
+        self.piper_model = '/home/user/piper/voices/es_ES/es_ES-davefx-medium.onnx'
 
         # --- Comprobación detallada de los ficheros de Piper ---
         piper_ok = os.path.isfile(self.piper_bin)
@@ -221,7 +228,21 @@ class KompaiApp(tk.Tk):
         self.morning_summary_sent_today = False
         self.waiting_for_timer_duration = False
         self.active_timer_end_time = None
-        self.is_processing_command = False # NUEVO: Bloqueo para evitar eco
+        self.is_processing_command = False # Bloqueo para evitar eco
+        # --- NUEVO: Variables para el diálogo de creación de pastillas ---
+        self.waiting_for_pill_info = False
+        self.pill_dialog_step = None # 'name', 'days', 'time', 'confirm'
+        self.pill_creation_data = {}
+        # --- NUEVO: Variables para el diálogo de creación de recordatorios ---
+        self.waiting_for_reminder_date = False
+        self.pending_reminder_description = None
+        self.waiting_for_reminder_confirmation = False
+        self.pending_reminder_data = None
+        # --- NUEVO: Variables para el diálogo de creación de alarmas ---
+        self.waiting_for_alarm_confirmation = False
+        self.pending_alarm_data = None
+
+        self.last_spoken_text = "" # NUEVO: Para eliminar el eco del texto reconocido
         self.emergency_view_instance = None
 
         self.camera_status = "Desconocido"
@@ -319,6 +340,7 @@ class KompaiApp(tk.Tk):
                     continue
 
                 data = stream.read(4096, exception_on_overflow=False)
+
                 partial_result = json.loads(recognizer.PartialResult())
                 if partial_result.get('partial'): vosk_logger.info(f"Parcial: {partial_result['partial']}")
                 
@@ -330,11 +352,27 @@ class KompaiApp(tk.Tk):
                     if command:
                         vosk_logger.info(f"Reconocido (final): '{command}'")
                         wake_word = "teo"
-                        command_lower = command.lower()
 
-                        if command_lower.startswith(wake_word):
-                            # Extraer el comando real (lo que viene después de la palabra de activación)
-                            actual_command = command_lower.replace(wake_word, "", 1).strip()
+                        # --- NUEVO: Lógica para eliminar el eco de la última frase hablada ---
+                        if self.last_spoken_text:
+                            # Comprobamos si el texto reconocido empieza con las últimas palabras del asistente
+                            # Esto es útil si el usuario habla justo cuando el asistente termina.
+                            last_words = ' '.join(self.last_spoken_text.lower().split()[-4:]) # Coger las últimas 4 palabras
+                            if command.startswith(last_words):
+                                vosk_logger.info(f"Detectado posible eco de: '{last_words}'. Eliminándolo.")
+                                command = command[len(last_words):].strip()
+                                vosk_logger.info(f"Comando limpio: '{command}'")
+                            
+                            # Limpiamos la variable para que solo se use una vez
+                            self.last_spoken_text = ""
+
+
+                        command_lower = command.lower()
+                        
+                        # --- MEJORA: Detectar la palabra de activación al principio o al final ---
+                        if wake_word in command_lower:
+                            # Extraer el comando real eliminando la palabra de activación
+                            actual_command = command_lower.replace(wake_word, "").strip()
                             
                             if actual_command:
                                 vosk_logger.info(f"Palabra de activación detectada. Procesando comando: '{actual_command}'")
@@ -356,6 +394,10 @@ class KompaiApp(tk.Tk):
                 action_type = action.get('type')
 
                 if action_type == 'speak':
+                    # NUEVO: Activar el bloqueo al empezar a hablar para evitar eco.
+                    self.is_processing_command = True
+                    # NUEVO: Guardar el texto que se va a decir para la cancelación de eco
+                    self.last_spoken_text = action['text']
                     self.speaker.speak(action['text'])
                     if action.get('is_question'): # CORRECCIÓN: 'is_question' es un flag, no una acción
                         pass # La lógica de escucha continua lo gestiona
@@ -379,56 +421,51 @@ class KompaiApp(tk.Tk):
             self.after(100, self.process_ui_queue)
 
     def proactive_update_loop(self):
+        """Bucle principal que orquesta las tareas proactivas."""
         last_hourly_check = time.time()
         last_hydration_reminder = time.time()
-        HYDRATION_INTERVAL = 90 * 60 # 90 minutos en segundos
-
-        # --- Bucle Proactivo ---
-        # Este bucle se ejecuta constantemente para que el asistente tome la iniciativa.
-        # 1. Comprueba recordatorios de pastillas.
-        # 2. Da un resumen matutino una vez al día.
-        # 3. Recuerda beber agua cada 90 minutos.
-        # 4. Comprueba eventos del calendario y contactos sociales cada hora.
-        # El sensor de vídeo (movimiento, caídas, ausencia) funciona en su propio hilo.
-        # El reconocimiento de voz (Vosk) también funciona en su propio hilo.
 
         while True:
-            pills = self.pill_manager.check_reminders()
-            if pills:
-                self.ui_queue.put({'type': 'speak', 'text': f"Recuerda tomar: {', '.join(pills)}"})
-            
-            # --- NUEVO: Comprobar alarmas ---
-            alarm_actions = self.alarm_manager.check_alarms(datetime.now())
-            for action in alarm_actions:
-                self.ui_queue.put(action)
-            
-            # --- NUEVO: Comprobar temporizador activo ---
-            if self.active_timer_end_time and datetime.now() >= self.active_timer_end_time:
-                self.ui_queue.put({'type': 'speak', 'text': "¡El tiempo del temporizador ha terminado!"})
-                self.active_timer_end_time = None # Desactivar el temporizador
+            # Tareas que se comprueban frecuentemente
+            self._check_frequent_tasks()
 
-            # --- NUEVO: Recordatorio de hidratación ---
-            if time.time() - last_hydration_reminder > HYDRATION_INTERVAL:
-                self.ui_queue.put({'type': 'speak', 'text': "Recuerda beber un vaso de agua para mantenerte hidratado."})
-                last_hydration_reminder = time.time()
-
-            # --- NUEVO: Resumen Matutino ---
+            # Tareas que se comprueban periódicamente para no ser repetitivo
             now = datetime.now()
+            current_time = time.time()
+
+            if current_time - last_hydration_reminder > (90 * 60): # Cada 90 minutos
+                self.ui_queue.put({'type': 'speak', 'text': "Recuerda beber un vaso de agua para mantenerte hidratado."})
+                last_hydration_reminder = current_time
+
             if now.hour == 9 and not self.morning_summary_sent_today:
                 self.give_morning_summary()
-            if time.time() - last_hourly_check > 3600: # Cada hora
+                self.morning_summary_sent_today = True
+            elif now.hour != 9: # Resetear el flag fuera de la hora del resumen
+                self.morning_summary_sent_today = False
+
+            if current_time - last_hourly_check > 3600: # Cada hora
                 self.check_calendar_events()
                 self.check_social_contact()
-                last_hourly_check = time.time()
+                last_hourly_check = current_time
+            
             time.sleep(5)
-    #
-    # def safety_manager_loop(self):
-    #     while True:
-    #         # Comprobar inactividad
-    #         inactivity_actions = self.safety_manager.check_for_emergency()
-    #         for action in inactivity_actions:
-    #             self.ui_queue.put(action)
-    #         time.sleep(60) # Comprobar cada minuto
+
+    def _check_frequent_tasks(self):
+        """Comprueba tareas de alta frecuencia como pastillas, alarmas y temporizadores."""
+        # Comprobar recordatorios de pastillas
+        pills = self.pill_manager.check_reminders()
+        if pills:
+            self.ui_queue.put({'type': 'speak', 'text': f"Recuerda tomar: {', '.join(pills)}"})
+        
+        # Comprobar alarmas
+        alarm_actions = self.alarm_manager.check_alarms(datetime.now())
+        for action in alarm_actions:
+            self.ui_queue.put(action)
+        
+        # Comprobar temporizador activo
+        if self.active_timer_end_time and datetime.now() >= self.active_timer_end_time:
+            self.ui_queue.put({'type': 'speak', 'text': "¡El tiempo del temporizador ha terminado!"})
+            self.active_timer_end_time = None
 
     def check_calendar_events(self):
             today_str = date.today().isoformat()
@@ -448,68 +485,125 @@ class KompaiApp(tk.Tk):
                         break
                 except (ValueError, KeyError): continue
 
-    def handle_voice_command(self, command):
-            # --- NUEVO: Manejo de estado para respuesta a caída ---
+    def handle_voice_command(self, command_text):
+        """Procesa un comando de voz, busca una intención y ejecuta una acción."""
+        # --- SOLUCIÓN: Usar un bloque try...finally para garantizar la liberación del bloqueo ---
+        try:
+            # --- Manejo de estados conversacionales (diálogos) ---
             if self.waiting_for_fall_response:
-                self.handle_fall_response(command)
+                self.handle_fall_response(command_text)
                 return
-            # --- NUEVO: Manejo de estado para duración del temporizador ---
             if self.waiting_for_timer_duration:
-                self.handle_timer_duration_response(command)
+                self.handle_timer_duration_response(command_text)
+                return
+            # --- NUEVO: Manejo del diálogo de creación de pastillas ---
+            if self.waiting_for_pill_info:
+                self.handle_pill_creation_dialog(command_text)
+                return
+            # --- NUEVO: Manejo de diálogos de recordatorios ---
+            if self.waiting_for_reminder_date:
+                self.handle_reminder_date_response(command_text)
+                return
+            if self.waiting_for_reminder_confirmation:
+                self.handle_reminder_confirmation(command_text)
+                return
+            # --- NUEVO: Manejo de diálogo de confirmación de alarma ---
+            if self.waiting_for_alarm_confirmation:
+                self.handle_alarm_confirmation(command_text)
                 return
 
-            if not command: return
 
-            # Vosk devuelve un diccionario JSON como string, ej: '{"text" : "hola"}'
-            # Google devuelve un string simple. Normalizamos la entrada.
-            try:
-                command_data = json.loads(command)
-                command_lower = command_data.get("text", "").lower()
-            except (json.JSONDecodeError, AttributeError):
-                command_lower = command.lower()
-            
-            app_logger.info(f"Comando: '{command}'. Buscando intención...")
+            if not command_text:
+                return
 
-            # --- OPTIMIZACIÓN: Usar el mapa pre-procesado ---
-            # Ordenar los triggers de más largo a más corto para evitar coincidencias parciales (ej: "pon la radio" vs "radio")
-            for trigger in sorted(self.intent_map.keys(), key=len, reverse=True):
-                if trigger in command_lower:
-                    intent = self.intent_map[trigger]
-                    app_logger.info(f"Intención encontrada: '{intent['name']}'")
-                    response = random.choice(intent['responses'])
-                    params = intent.get('parameters', {})
-                    self.consecutive_failures = 0 # Resetear contador de fallos
-                    self.execute_action(intent.get('action'), command_lower, params, response)
+            # Normalizar la entrada a minúsculas
+            command_lower = command_text.lower()
+            app_logger.info(f"Comando: '{command_lower}'. Buscando intención...")
+
+            # --- MEJORA: Búsqueda de intención robusta con FuzzyWuzzy ---
+            if THEFUZZ_DISPONIBLE:
+                best_match_score = 0
+                best_intent = None
+                
+                # Iteramos sobre todas las intenciones definidas en intents.json
+                for intent in self.intents:
+                    # Para cada intención, comprobamos todos sus posibles triggers
+                    for trigger in intent.get('triggers', []):
+                        # Usamos token_set_ratio que es bueno para ignorar el orden de las palabras
+                        # y palabras comunes. Ej: "pon la radio teo" vs "teo radio pon"
+                        score = fuzz.token_set_ratio(command_lower, trigger)
+                        if score > best_match_score:
+                            best_match_score = score
+                            best_intent = intent
+                
+                # Si la mejor coincidencia supera nuestro umbral de confianza, la aceptamos
+                CONFIDENCE_THRESHOLD = 85 # Umbral de confianza (85%)
+                if best_match_score >= CONFIDENCE_THRESHOLD:
+                    app_logger.info(f"Intención encontrada con FuzzyMatch: '{best_intent['name']}' (Confianza: {best_match_score}%)")
+                    response = random.choice(best_intent['responses'])
+                    params = best_intent.get('parameters', {})
+                    self.consecutive_failures = 0
+                    self.execute_action(best_intent.get('action'), command_lower, params, response)
                     return
-            
-            # --- NUEVO: Manejo de fallos de reconocimiento consecutivos ---
-            self.consecutive_failures += 1
-            if self.consecutive_failures == 1:
-                # No bloqueamos aquí, la cola de UI lo hará
-                self.ui_queue.put({'type': 'speak', 'text': "No he entendido esa orden."})
-            elif self.consecutive_failures == 2:
-                # No bloqueamos aquí, la cola de UI lo hará
-                self.ui_queue.put({'type': 'speak', 'text': "Sigo sin entender, ¿puedes repetirlo de otra forma?"})
+                else:
+                    app_logger.warning(f"Ninguna intención superó el umbral de confianza. Mejor coincidencia: '{best_intent.get('name', 'Ninguna')}' con {best_match_score}%")
             else:
-                # Después de 2 fallos, se queda en silencio para no ser molesto.
-                # El contador se reseteará en el próximo comando exitoso.
-                app_logger.warning("Tercer fallo de reconocimiento consecutivo. El asistente permanecerá en silencio pero seguirá escuchando.")
-                self.is_processing_command = False # Liberamos el bloqueo para que pueda seguir escuchando
-                if self.frames.get("MainView"):
-                    self.frames["MainView"].update_status("No te he entendido. Inténtalo de nuevo.")
+                # --- Lógica original si thefuzz no está disponible ---
+                for trigger in sorted(self.intent_map.keys(), key=len, reverse=True):
+                    if trigger in command_lower:
+                        # --- CÓDIGO CORREGIDO: Añadir la lógica de búsqueda exacta ---
+                        intent = self.intent_map[trigger]
+                        app_logger.info(f"Intención encontrada con Búsqueda Exacta: '{intent['name']}'")
+                        response = random.choice(intent['responses'])
+                        params = intent.get('parameters', {})
+                        self.consecutive_failures = 0  # Resetear contador de fallos
+                        self.execute_action(intent.get('action'), command_lower, params, response)
+                        return
+            
+            # --- Manejo de fallos si no se encuentra ninguna intención ---
+            self.consecutive_failures += 1
+            self.handle_unrecognized_command()
 
+        finally:
+            # --- SOLUCIÓN: Liberar el bloqueo SIEMPRE, a menos que se haya enviado una acción de 'speak' ---
+            # Si se envió una acción de 'speak', el bloqueo se liberará cuando el altavoz termine.
+            # Si no se envió (como en el 3er fallo), se libera aquí para evitar el bloqueo.
+            # Comprobamos si la cola de UI está vacía o si la última acción no fue 'speak'.
+            # Una forma más simple es simplemente liberarlo si el altavoz no está ocupado.
+            if not self.speaker.is_busy:
+                self.is_processing_command = False
+                # Si el altavoz está ocupado, el 'speaker_status' se encargará de liberar el bloqueo.
 
+    def handle_unrecognized_command(self):
+        """Gestiona la respuesta cuando un comando no es reconocido."""
+        if self.consecutive_failures == 1:
+            self.ui_queue.put({'type': 'speak', 'text': "No he entendido esa orden."})
+        elif self.consecutive_failures == 2:
+            self.ui_queue.put({'type': 'speak', 'text': "Sigo sin entender, ¿puedes repetirlo de otra forma?"})
+        else:
+            app_logger.warning("Tercer fallo de reconocimiento consecutivo. El asistente permanecerá en silencio pero seguirá escuchando.")
+            # No se envía acción de 'speak', por lo que el bloqueo debe liberarse manualmente.
+            # El bloque 'finally' en handle_voice_command se encargará de esto.
+            if self.frames.get("MainView"):
+                self.frames["MainView"].update_status("No te he entendido. Inténtalo de nuevo.")
 
     def execute_action(self, name, cmd, params, resp):
         action_map = {
-            "responder_simple": self.action_responder_simple, "accion_apagar": self.action_apagar,
-            "mostrar_vista": self.action_mostrar_vista, "consultar_pastillero": self.action_consultar_pastillero,
-            "consultar_pastillero_dia": self.action_consultar_pastillero_dia, "consultar_citas": self.action_consultar_citas, "decir_hora_actual": self.action_decir_hora_fecha,
-            "decir_fecha_actual": self.action_decir_hora_fecha, "llamar_contacto_dinamico": self.action_llamar_contacto,
-            "accion_sos": self.action_sos, "mostrar_vista_pastillero": self.action_mostrar_vista_pastillero,
+            "responder_simple": self.action_responder_simple,
+            "accion_apagar": self.action_apagar,
+            "mostrar_vista": self.action_mostrar_vista,
+            "consultar_pastillero": self.action_consultar_pastillero,
+            "consultar_pastillero_dia": self.action_consultar_pastillero_dia,
+            "consultar_citas": self.action_consultar_citas,
+            "decir_hora_actual": self.action_decir_hora_fecha,
+            "decir_fecha_actual": self.action_decir_hora_fecha,
+            "llamar_contacto_dinamico": self.action_llamar_contacto,
+            "accion_sos": self.action_sos,
+            "mostrar_vista_pastillero": self.action_mostrar_vista_pastillero,
             "controlar_radio": self.action_controlar_radio,
             "detener_radio": self.action_detener_radio, "cerrar_vista_emergencia": self.action_cerrar_emergencia,
             "registrar_llamada_completada": self.action_registrar_llamada, "crear_recordatorio_voz": self.action_crear_recordatorio_voz, "crear_alarma_voz": self.action_crear_alarma_voz, "consultar_recordatorios_dia": self.action_consultar_recordatorios_dia, "consultar_alarmas": self.action_consultar_alarmas, "iniciar_dialogo_temporizador": self.action_iniciar_dialogo_temporizador, "consultar_temporizador": self.action_consultar_temporizador, "crear_temporizador_directo": self.action_crear_temporizador_directo,
+            "iniciar_dialogo_pastilla": self.action_iniciar_dialogo_pastilla,
             "contar_chiste": self.action_contar_contenido_aleatorio, "decir_frase_celebre": self.action_decir_frase_celebre,
             "contar_dato_curioso": self.action_contar_contenido_aleatorio, "decir_frase_celebre": self.action_decir_frase_celebre,
             "decir_dia_semana": self.action_decir_dia_semana,
@@ -519,6 +613,7 @@ class KompaiApp(tk.Tk):
             action_map[name](command=cmd, params=params, response=resp)
         else:
             app_logger.warning(f"Acción '{name}' no definida.")
+            self.is_processing_command = False # Liberar bloqueo si la acción no existe
 
     def save_health_data(self, new_data):
         """Guarda los datos de salud en el fichero JSON y actualiza el estado interno."""
@@ -624,31 +719,90 @@ class KompaiApp(tk.Tk):
 
         parsed_data = parse_reminder_from_text(reminder_text)
 
-        if parsed_data:
-            year, month, day = map(int, parsed_data['date'].split('-'))
-            hour, minute = map(int, parsed_data['time'].split(':'))
-            self.calendar_manager.add_event(year, month, day, hour, minute, parsed_data['description'])
-            self.ui_queue.put({'type': 'speak', 'text': f"{response} {parsed_data['description']} para el {parsed_data['date']} a las {parsed_data['time']}."})
-        else:
-            self.ui_queue.put({'type': 'speak', 'text': "No he podido entender la fecha o la descripción del recordatorio. ¿Puedes intentarlo de nuevo?"})
+        if not parsed_data:
+            self.ui_queue.put({'type': 'speak', 'text': "No he podido entender la descripción del recordatorio. ¿Puedes intentarlo de nuevo?"})
+            return
 
+        # --- MEJORA: Lógica de diálogo para confirmación y fechas faltantes ---
+        if parsed_data.get("status") == "needs_date":
+            # El usuario no dijo una fecha, así que la pedimos.
+            self.waiting_for_reminder_date = True
+            self.pending_reminder_description = parsed_data['description']
+            self.ui_queue.put({'type': 'speak', 'text': f"Claro, ¿para cuándo quieres que te recuerde '{self.pending_reminder_description}'?"})
+        else:
+            # Tenemos todos los datos, ahora pedimos confirmación.
+            self.pending_reminder_data = parsed_data
+            self.waiting_for_reminder_confirmation = True
+            
+            # Si la hora fue inferida, la ponemos a las 9 AM por defecto.
+            if parsed_data.get("time_inferred", False):
+                self.pending_reminder_data["time"] = "09:00"
+                feedback_hora = "a las 9 de la mañana"
+            else:
+                feedback_hora = f"a las {parsed_data['time']}"
+
+            confirm_text = f"He entendido: recordatorio para {parsed_data['description']} el día {parsed_data['date']} {feedback_hora}. ¿Es correcto?"
+            self.ui_queue.put({'type': 'speak', 'text': confirm_text})
+
+    def handle_reminder_confirmation(self, command_text):
+        """Gestiona la respuesta de confirmación del usuario para un recordatorio."""
+        self.waiting_for_reminder_confirmation = False # Salir del estado de espera
+        
+        if 'sí' in command_text.lower() or 'si' in command_text.lower() or 'correcto' in command_text.lower():
+            data = self.pending_reminder_data
+            year, month, day = map(int, data['date'].split('-'))
+            hour, minute = map(int, data['time'].split(':'))
+            self.calendar_manager.add_event(year, month, day, hour, minute, data['description'])
+            self.ui_queue.put({'type': 'speak', 'text': "¡Perfecto! Recordatorio guardado."})
+        else:
+            self.ui_queue.put({'type': 'speak', 'text': "De acuerdo, he cancelado el recordatorio."})
+        
+        self.pending_reminder_data = None
+
+    def handle_reminder_date_response(self, command_text):
+        """Procesa la fecha que el usuario da en el segundo paso del diálogo."""
+        self.waiting_for_reminder_date = False
+        full_command = f"{self.pending_reminder_description} {command_text}"
+        self.pending_reminder_description = None
+        # Volvemos a llamar a la acción principal, pero ahora con la frase completa
+        self.action_crear_recordatorio_voz(command=full_command, response="De acuerdo, anotado:")
+        
     def action_crear_alarma_voz(self, command, response, **kwargs):
         """Parsea un comando de voz para crear una alarma recurrente."""
         parsed_data = parse_alarm_from_text(command)
-
+    
         if parsed_data:
+            # --- MEJORA: Pedir confirmación antes de guardar ---
+            self.pending_alarm_data = parsed_data
+            self.waiting_for_alarm_confirmation = True
+    
             hour, minute = parsed_data['time']
             days = parsed_data['days']
-            label = parsed_data['label']
-            self.alarm_manager.add_alarm(hour, minute, days, label)
             
             days_str_map = {0: "Lunes", 1: "Martes", 2: "Miércoles", 3: "Jueves", 4: "Viernes", 5: "Sábado", 6: "Domingo"}
-            days_text = "todos los días" if len(days) == 7 else ", ".join([days_str_map[d] for d in sorted(days)])
+            if len(days) == 7 or not days: # Si no se especifican días, es para todos
+                days_text = "todos los días"
+            else:
+                days_text = "los " + ", ".join([days_str_map[d] for d in sorted(days)])
             
-            feedback = f"{response} Alarma programada para las {hour:02d}:{minute:02d} para {days_text}."
-            self.ui_queue.put({'type': 'speak', 'text': feedback})
+            confirm_text = f"Entendido. Voy a programar una alarma para las {hour:02d}:{minute:02d} {days_text}. ¿Es correcto?"
+            self.ui_queue.put({'type': 'speak', 'text': confirm_text})
         else:
             self.ui_queue.put({'type': 'speak', 'text': "No he podido entender la hora de la alarma. Por favor, inténtalo de nuevo."})
+
+    def handle_alarm_confirmation(self, command_text):
+        """Gestiona la respuesta de confirmación del usuario para una alarma."""
+        self.waiting_for_alarm_confirmation = False # Salir del estado de espera
+
+        if 'sí' in command_text.lower() or 'si' in command_text.lower() or 'correcto' in command_text.lower():
+            data = self.pending_alarm_data
+            hour, minute = data['time']
+            self.alarm_manager.add_alarm(hour, minute, data['days'], data['label'])
+            self.ui_queue.put({'type': 'speak', 'text': "¡Hecho! Alarma guardada."})
+        else:
+            self.ui_queue.put({'type': 'speak', 'text': "De acuerdo, he cancelado la alarma."})
+        
+        self.pending_alarm_data = None
 
     def action_consultar_alarmas(self, response, **kwargs):
         """Consulta las alarmas programadas y las lee en voz alta."""
@@ -710,6 +864,78 @@ class KompaiApp(tk.Tk):
                 self.ui_queue.put({'type': 'speak', 'text': "No puedo poner un temporizador de cero minutos."})
         else:
             self.ui_queue.put({'type': 'speak', 'text': "No he entendido la duración. Por favor, inténtalo de nuevo."})
+
+    # --- NUEVO: Métodos para el diálogo de creación de pastillas ---
+    def action_iniciar_dialogo_pastilla(self, response, **kwargs):
+        """Inicia el diálogo para añadir una nueva pastilla."""
+        self.waiting_for_pill_info = True
+        self.pill_dialog_step = 'name'
+        self.pill_creation_data = {} # Limpiar datos anteriores
+        self.ui_queue.put({'type': 'speak', 'text': response})
+
+    def handle_pill_creation_dialog(self, command_text):
+        """Gestiona los pasos del diálogo para crear una pastilla."""
+        if "cancelar" in command_text.lower():
+            self.reset_pill_dialog()
+            self.ui_queue.put({'type': 'speak', 'text': "De acuerdo, cancelando la creación de la pastilla."})
+            return
+
+        if self.pill_dialog_step == 'name':
+            self.pill_creation_data['name'] = command_text.capitalize()
+            self.pill_dialog_step = 'days'
+            self.ui_queue.put({'type': 'speak', 'text': f"Entendido, {self.pill_creation_data['name']}. ¿Qué días de la semana la tienes que tomar?"})
+
+        elif self.pill_dialog_step == 'days':
+            parsed_days = self._parse_days_from_text(command_text)
+            if not parsed_days:
+                self.ui_queue.put({'type': 'speak', 'text': "No he entendido los días. Por favor, di algo como 'lunes, miércoles y viernes' o 'todos los días'."})
+                return
+            self.pill_creation_data['days'] = parsed_days
+            self.pill_dialog_step = 'time'
+            self.ui_queue.put({'type': 'speak', 'text': "¿Y a qué hora? Por ejemplo, a las 8 de la mañana o a las dos y media."})
+
+        elif self.pill_dialog_step == 'time':
+            parsed_time = parse_alarm_from_text(command_text) # Reutilizamos el parser de alarmas
+            if not parsed_time or 'time' not in parsed_time:
+                self.ui_queue.put({'type': 'speak', 'text': "No he entendido la hora. Por favor, di una hora clara como 'a las 9 y media'."})
+                return
+            hour, minute = parsed_time['time']
+            self.pill_creation_data['time'] = f"{hour:02d}:{minute:02d}"
+            self.pill_dialog_step = 'confirm'
+            
+            days_text = ", ".join(self.pill_creation_data['days'])
+            confirm_text = f"Perfecto. Voy a añadir {self.pill_creation_data['name']} para los {days_text} a las {self.pill_creation_data['time']}. ¿Es correcto?"
+            self.ui_queue.put({'type': 'speak', 'text': confirm_text})
+
+        elif self.pill_dialog_step == 'confirm':
+            if 'sí' in command_text.lower() or 'si' in command_text.lower() or 'correcto' in command_text.lower():
+                # Guardar la pastilla
+                name = self.pill_creation_data['name']
+                time_slot = self.pill_creation_data['time']
+                for day in self.pill_creation_data['days']:
+                    self.pill_manager.add_pill(name, day, time_slot)
+                self.ui_queue.put({'type': 'speak', 'text': "¡Hecho! La pastilla ha sido añadida a tu pastillero."})
+            else:
+                self.ui_queue.put({'type': 'speak', 'text': "De acuerdo, no guardaré los cambios. Puedes empezar de nuevo si quieres."})
+            self.reset_pill_dialog()
+
+    def _parse_days_from_text(self, text):
+        """Función auxiliar para extraer días de la semana de un texto."""
+        text = text.lower()
+        day_map = {"lunes": "Lunes", "martes": "Martes", "miércoles": "Miércoles", "jueves": "Jueves", "viernes": "Viernes", "sábado": "Sábado", "domingo": "Domingo"}
+        found_days = []
+        if "todos los días" in text or "cada día" in text:
+            return list(day_map.values())
+        for key, value in day_map.items():
+            if key in text:
+                found_days.append(value)
+        return found_days
+
+    def reset_pill_dialog(self):
+        """Resetea el estado del diálogo de creación de pastillas."""
+        self.waiting_for_pill_info = False
+        self.pill_dialog_step = None
+        self.pill_creation_data = {}
 
     def action_consultar_recordatorios_dia(self, command, response, **kwargs):
         """Consulta los recordatorios para un día específico de la semana."""
@@ -933,6 +1159,19 @@ class KompaiApp(tk.Tk):
             ram = psutil.virtual_memory().percent
             return f"{cpu}%", f"{ram}%"
         return "N/D", "N/D"
+    def get_ip_address(self):
+        """Obtiene la dirección IP local del dispositivo."""
+        try:
+            # Conectar a un host externo (no necesita ser alcanzable) para obtener la IP local
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0)
+            s.connect(('10.254.254.254', 1))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "No disponible"
+
 class MainView(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent, bg=COLOR_PRIMARY_BG)
@@ -1706,7 +1945,7 @@ class SystemStatusView(tk.Frame):
 
         self.status_labels = {}
         metrics = [
-            "Motor de Voz (Piper)", "Reconocimiento de Voz (Vosk)", "Cámara",
+            "Dirección IP", "Motor de Voz (Piper)", "Reconocimiento de Voz (Vosk)", "Cámara",
             "Conexión a Internet", "Temperatura CPU", "Uso de CPU", "Uso de RAM"
         ]
         for i, metric in enumerate(metrics):
@@ -1722,6 +1961,9 @@ class SystemStatusView(tk.Frame):
 
     def update_status(self):
         """Recopila y muestra el estado actual del sistema."""
+        # Dirección IP
+        self.status_labels["Dirección IP"].config(text=self.controller.get_ip_address())
+        
         # Motor de Voz
         piper_status = "✅ Operativo" if self.controller.speaker.is_available else "❌ No disponible"
         self.status_labels["Motor de Voz (Piper)"].config(text=piper_status, fg="green" if self.controller.speaker.is_available else "red")
@@ -1901,16 +2143,53 @@ class AlarmView(tk.Frame):
         form_frame = tk.Frame(popup, bg=COLOR_PRIMARY_BG, padx=20, pady=20)
         form_frame.pack(expand=True, fill="both")
 
-        tk.Label(form_frame, text="Hora (HH:MM):", font=("Helvetica", 12), bg=COLOR_PRIMARY_BG).pack(anchor="w")
-        time_entry = tk.Entry(form_frame, font=("Helvetica", 12))
-        time_entry.pack(fill="x", pady=(0, 10))
+        # --- MEJORA: Selector de hora sin teclado ---
+        tk.Label(form_frame, text="Hora:", font=("Helvetica", 12, "bold"), bg=COLOR_PRIMARY_BG).pack(anchor="w")
+        
+        time_selector_frame = tk.Frame(form_frame, bg=COLOR_PRIMARY_BG)
+        time_selector_frame.pack(fill="x", pady=5)
+
+        # Variables para la hora y los minutos
+        self.hour_var = tk.IntVar(value=datetime.now().hour)
+        self.minute_var = tk.IntVar(value=datetime.now().minute)
+
+        # --- Selector de Horas ---
+        hour_frame = tk.Frame(time_selector_frame, bg=COLOR_PRIMARY_BG)
+        hour_frame.pack(side="left", expand=True, padx=10)
+        
+        up_hour_button = ttk.Button(hour_frame, text="▲", command=lambda: self.change_time(self.hour_var, 1, 23), style="Grid.TButton")
+        up_hour_button.pack()
+        self.hour_label = tk.Label(hour_frame, textvariable=self.hour_var, font=("Helvetica", 48, "bold"), bg=COLOR_SECONDARY_BG, width=3)
+        self.hour_label.pack(pady=5)
+        down_hour_button = ttk.Button(hour_frame, text="▼", command=lambda: self.change_time(self.hour_var, -1, 23), style="Grid.TButton")
+        down_hour_button.pack()
+
+        # Separador
+        tk.Label(time_selector_frame, text=":", font=("Helvetica", 48, "bold"), bg=COLOR_PRIMARY_BG).pack(side="left")
+
+        # --- Selector de Minutos ---
+        minute_frame = tk.Frame(time_selector_frame, bg=COLOR_PRIMARY_BG)
+        minute_frame.pack(side="left", expand=True, padx=10)
+
+        up_minute_button = ttk.Button(minute_frame, text="▲", command=lambda: self.change_time(self.minute_var, 1, 59), style="Grid.TButton")
+        up_minute_button.pack()
+        self.minute_label = tk.Label(minute_frame, textvariable=self.minute_var, font=("Helvetica", 48, "bold"), bg=COLOR_SECONDARY_BG, width=3)
+        self.minute_label.pack(pady=5)
+        down_minute_button = ttk.Button(minute_frame, text="▼", command=lambda: self.change_time(self.minute_var, -1, 59), style="Grid.TButton")
+        down_minute_button.pack()
+
+        # Formatear los números iniciales a dos dígitos
+        self.hour_var.trace_add("write", lambda *args: self.format_time_label(self.hour_label, self.hour_var))
+        self.minute_var.trace_add("write", lambda *args: self.format_time_label(self.minute_label, self.minute_var))
+        self.format_time_label(self.hour_label, self.hour_var)
+        self.format_time_label(self.minute_label, self.minute_var)
 
         tk.Label(form_frame, text="Etiqueta:", font=("Helvetica", 12), bg=COLOR_PRIMARY_BG).pack(anchor="w")
         label_entry = tk.Entry(form_frame, font=("Helvetica", 12))
         label_entry.pack(fill="x", pady=(0, 10))
         label_entry.insert(0, "Alarma")
 
-        tk.Label(form_frame, text="Días:", font=("Helvetica", 12), bg=COLOR_PRIMARY_BG).pack(anchor="w")
+        tk.Label(form_frame, text="Días:", font=("Helvetica", 12, "bold"), bg=COLOR_PRIMARY_BG).pack(anchor="w", pady=(10,0))
         days_vars = {day: tk.BooleanVar() for day in ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]}
         days_frame = tk.Frame(form_frame, bg=COLOR_PRIMARY_BG)
         days_frame.pack(fill="x", pady=(0, 20))
@@ -1919,16 +2198,29 @@ class AlarmView(tk.Frame):
 
         def on_save():
             try:
-                hour, minute = map(int, time_entry.get().split(':'))
+                hour = self.hour_var.get()
+                minute = self.minute_var.get()
                 selected_days = [i for i, day in enumerate(days_vars) if days_vars[day].get()]
                 self.controller.alarm_manager.add_alarm(hour, minute, selected_days, label_entry.get())
                 self.render_alarms()
                 popup.destroy()
             except Exception:
-                messagebox.showerror("Error", "Formato de hora incorrecto. Usa HH:MM.", parent=popup)
+                messagebox.showerror("Error", "Ocurrió un error al guardar la alarma.", parent=popup)
 
         save_button = ttk.Button(form_frame, text="Guardar Alarma", command=on_save)
         save_button.pack()
+
+    def change_time(self, time_var, amount, max_val):
+        """Función para incrementar/decrementar la hora/minuto con efecto 'wrap-around'."""
+        current_val = time_var.get()
+        new_val = current_val + amount
+        if new_val > max_val: new_val = 0
+        if new_val < 0: new_val = max_val
+        time_var.set(new_val)
+
+    def format_time_label(self, label_widget, time_var):
+        """Asegura que el número en la etiqueta siempre tenga dos dígitos."""
+        label_widget.config(text=f"{time_var.get():02d}")
 
 # --- VISTA DE RELOJ Y TEMPORIZADOR ---
 class ClockTimerView(tk.Toplevel):
