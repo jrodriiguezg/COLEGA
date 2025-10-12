@@ -133,61 +133,13 @@ echo ""
 echo "[PASO 6/6] Finalizando la instalación y mostrando avisos importantes..."
 echo ""
 
-# Pregunta sobre la cámara ESP32
-read -p "¿Vas a utilizar una cámara ESP32 para el streaming de vídeo? (s/n): " use_esp32_cam
-
-if [[ "$use_esp32_cam" =~ ^[Ss]$ ]]; then
-    echo ""
-    echo "Ha indicado que usará una cámara ESP32. Por favor, elija el método de conexión:"
-    echo "  1. Conectar la ESP32 a su red Wi-Fi existente (método recomendado)."
-    echo "  2. Configurar la Raspberry Pi como un Punto de Acceso (AP) y conectar la ESP32 a ella (avanzado)."
-    read -p "Elija una opción (1 o 2): " connection_choice
-    echo ""
-
-    if [[ "$connection_choice" == "1" ]]; then
-        echo "---------------------- ¡AVISO IMPORTANTE: CÁMARA ESP32 (Red Wi-Fi Existente)! ----------------------"
-        echo "Para que la cámara funcione, necesitas realizar DOS configuraciones:"
-        echo ""
-        echo "1. EN LA PLACA ESP32-CAM:"
-        echo "   - Abre el fichero del firmware (ej: 'esp32_cam.ino') en el IDE de Arduino."
-        echo "   - Introduce el nombre (SSID) y la contraseña de tu red WiFi."
-        echo "   - Carga (flashea) este firmware actualizado en tu placa ESP32."
-        echo ""
-        echo "2. EN LA APLICACIÓN OpenKompai (este dispositivo):"
-        echo "   - Una vez la ESP32 esté conectada, busca su dirección IP en tu router."
-        echo "   - Edita el fichero: $(pwd)/OpenKompaiTK.py"
-        echo '   - Busca y modifica la línea: ESP32_STREAM_URL = "http://..."'
-        echo "   - Reemplaza la URL de ejemplo por la dirección IP real de tu cámara."
-        echo "--------------------------------------------------------------------------------------------------"
-        echo ""
-    elif [[ "$connection_choice" == "2" ]]; then
-        echo "---------------------- ¡AVISO IMPORTANTE: CÁMARA ESP32 (Modo Punto de Acceso)! ----------------------"
-        echo "[!] ADVERTENCIA: Al usar este modo, la Raspberry Pi no podrá conectarse a Internet por Wi-Fi,"
-        echo "    ya que su antena se usará para crear el punto de acceso. Necesitarás una conexión por"
-        echo "    cable (Ethernet) si la Pi requiere acceso a Internet."
-        echo ""
-        echo "Para configurar este modo, siga estos pasos:"
-        echo ""
-        echo "1. CONFIGURE LA RASPBERRY PI COMO PUNTO DE ACCESO:"
-        echo "   - La configuración de un punto de acceso es un proceso avanzado."
-        echo "   - Le recomendamos seguir la guía oficial de Raspberry Pi:"
-        echo "     https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico-w.html#setting-up-an-access-point"
-        echo "   - Durante la guía, definirá un nombre de red (SSID) y una contraseña para el punto de acceso."
-        echo ""
-        echo "2. CONFIGURE LA PLACA ESP32-CAM:"
-        echo "   - En el fichero 'esp32_cam.ino', use el SSID y la contraseña que creó en el paso anterior."
-        echo ""
-        echo "3. CONFIGURE LA APLICACIÓN OpenKompai:"
-        echo "   - La IP de la ESP32 será fija. Según la guía, normalmente será '192.168.4.2'."
-        echo "   - Edite el fichero '$(pwd)/OpenKompaiTK.py' y establezca:"
-        echo '     ESP32_STREAM_URL = "http://192.168.4.2/stream"'
-        echo "----------------------------------------------------------------------------------------------------"
-        echo ""
-    else
-        echo "Opción no válida. Se omiten las instrucciones de la cámara. Puede consultarlas en el script más tarde."
-        echo ""
-    fi
-fi
+echo "---------------------- ¡AVISO IMPORTANTE: CÁMARA ESP32! ----------------------"
+echo "Si vas a usar una cámara ESP32, recuerda configurar su firmware con los"
+echo "datos de tu red Wi-Fi y después, modificar el fichero 'OpenKompaiTK.py'"
+echo "para establecer la dirección IP correcta de la cámara en la variable"
+echo "'ESP32_STREAM_URL'."
+echo "-----------------------------------------------------------------------------"
+echo ""
 
 echo "-------------------------- ¡ATENCIÓN: MOTOR DE VOZ! --------------------------"
 echo "El motor de Texto a Voz (Piper) requiere una instalación manual."
