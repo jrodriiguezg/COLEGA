@@ -1,12 +1,55 @@
 import re
 from datetime import datetime, timedelta
+# --- NUEVO: Importar la librería dateparser ---
+try:
+    # Usamos search_dates que es ideal para encontrar fechas dentro de un texto más largo
+    from dateparser.search import search_dates
+    DATEPARSER_AVAILABLE = True
+except ImportError:
+    search_dates = None
+    DATEPARSER_AVAILABLE = False
 
 def parse_reminder_from_text(text):
     """
     Analiza un texto para extraer la descripción, fecha y hora de un recordatorio.
-    Devuelve un diccionario con 'description', 'date' (YYYY-MM-DD) y 'time' (HH:MM),
-    o None si no puede parsear la información.
+    VERSIÓN MEJORADA con la librería dateparser.
     """
+    if not DATEPARSER_AVAILABLE:
+        # Si dateparser no está instalado, usamos la lógica original como respaldo.
+        return _parse_reminder_from_text_original(text)
+
+    # Buscamos fechas en español, prefiriendo fechas futuras.
+    # 'search_dates' devuelve una lista de tuplas: (texto_encontrado, objeto_datetime)
+    found_dates = search_dates(text, languages=['es'], settings={'PREFER_DATES_FROM': 'future'})
+
+    if not found_dates:
+        # --- MEJORA 1: Gestionar ambigüedad ---
+        # Si no se encuentra fecha, no fallamos. Devolvemos la descripción
+        # para que el asistente pueda preguntar "¿Para cuándo?".
+        return {
+            "status": "needs_date",
+            "description": text.capitalize(),
+            "date": None,
+            "time": None
+        }
+
+    # Nos quedamos con la primera fecha encontrada
+    date_text, reminder_datetime = found_dates[0]
+    is_time_inferred = reminder_datetime.hour == 0 and reminder_datetime.minute == 0
+
+    # La descripción es el texto original sin la parte de la fecha.
+    description = text.replace(date_text, '').strip()
+
+    return {
+        "description": description.capitalize(),
+        "date": reminder_datetime.strftime("%Y-%m-%d"),
+        "time": reminder_datetime.strftime("%H:%M"),
+        # --- MEJORA 2: Añadir un flag para saber si la hora fue especificada ---
+        "time_inferred": is_time_inferred
+    }
+
+def _parse_reminder_from_text_original(text):
+    """Lógica original de parseo manual como fallback."""
     text = text.lower()
     
     # --- Mapeos de texto a valores ---
