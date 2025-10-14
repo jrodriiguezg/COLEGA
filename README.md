@@ -10,3 +10,5 @@ La instalacion solo ha sido probada en Raspberry pi 4B 4Gb con Raspberry Pi OS L
 curl -sSL https://raw.githubusercontent.com/jrodriiguezg/OpenKompai_nano/refs/heads/main/install.sh | bash 
 
 ```
+Este proyecto forma parte de una de las propuestas presentadas en el Hackaton de AreaProyect 2025, puedes ver la documentacion entregada en este enlace: 
+https://openkompai-nano.readthedocs.io/es/latest/
