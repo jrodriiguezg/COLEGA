@@ -3,7 +3,7 @@ import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from modules.calendar import CalendarManager
+from modules.calendar_manager import CalendarManager
 
 class DashboardDataManager:
     def __init__(self, config_manager=None):

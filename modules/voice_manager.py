@@ -99,7 +99,8 @@ class VoiceManager:
     def start_listening(self, intents=None):
         """Inicia el bucle de escucha en un hilo separado."""
         self.is_listening = True
-        threading.Thread(target=self._continuous_voice_listener, args=(intents,), daemon=True).start()
+        self.listener_thread = threading.Thread(target=self._continuous_voice_listener, args=(intents,), daemon=True)
+        self.listener_thread.start()
 
     def stop_listening(self):
         self.is_listening = False
@@ -172,6 +173,7 @@ class VoiceManager:
                 vosk_logger.info(f"Escucha activa. Motor: {stt_engine}")
             except Exception as e:
                 vosk_logger.error(f"Error stream audio: {e}")
+                self.is_listening = False # Disable loop to prevent watchdog spam
                 return
 
         while self.is_listening:
@@ -210,6 +212,15 @@ class VoiceManager:
             except Exception as e:
                 vosk_logger.error(f"Error en bucle de voz: {e}")
                 time.sleep(1)
+        
+        # Cleanup
+        try:
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+            vosk_logger.info("Stream de audio cerrado correctamente.")
+        except Exception as e:
+            vosk_logger.error(f"Error cerrando stream: {e}")
 
     def _whisper_listener(self):
         """Bucle de escucha para Faster-Whisper con VAD basado en energía."""

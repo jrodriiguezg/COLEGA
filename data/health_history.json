@@ -1,0 +1,530 @@
+[
+    {
+        "timestamp": 1766345594.334226,
+        "date": "2025-12-21T20:33:14.334230",
+        "target": "nginx",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "57.4%",
+            "ram": "59.0%",
+            "disk": 71.9,
+            "temp": "95.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345594.5503929,
+        "date": "2025-12-21T20:33:14.550394",
+        "target": "nginx",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "66.0%",
+            "ram": "57.8%",
+            "disk": 71.9,
+            "temp": "95.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345594.6806722,
+        "date": "2025-12-21T20:33:14.680674",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "68.8%",
+            "ram": "58.7%",
+            "disk": 71.9,
+            "temp": "95.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345594.8211303,
+        "date": "2025-12-21T20:33:14.821133",
+        "target": "cron",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "70.4%",
+            "ram": "58.2%",
+            "disk": 71.9,
+            "temp": "94.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345594.9414816,
+        "date": "2025-12-21T20:33:14.941485",
+        "target": "networking",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "69.2%",
+            "ram": "58.5%",
+            "disk": 71.9,
+            "temp": "94.6\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345595.1057878,
+        "date": "2025-12-21T20:33:15.105798",
+        "target": "networking",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "53.6%",
+            "ram": "58.9%",
+            "disk": 71.9,
+            "temp": "94.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345625.3961053,
+        "date": "2025-12-21T20:33:45.396106",
+        "target": "nginx",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "3.1%",
+            "ram": "63.2%",
+            "disk": 71.9,
+            "temp": "68.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345625.5625134,
+        "date": "2025-12-21T20:33:45.562515",
+        "target": "nginx",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "8.7%",
+            "ram": "63.2%",
+            "disk": 71.9,
+            "temp": "68.0\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345625.690803,
+        "date": "2025-12-21T20:33:45.690804",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "8.1%",
+            "ram": "63.5%",
+            "disk": 71.9,
+            "temp": "68.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345625.818047,
+        "date": "2025-12-21T20:33:45.818048",
+        "target": "cron",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "11.3%",
+            "ram": "63.5%",
+            "disk": 71.9,
+            "temp": "69.6\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345625.943277,
+        "date": "2025-12-21T20:33:45.943278",
+        "target": "networking",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "8.1%",
+            "ram": "63.5%",
+            "disk": 71.9,
+            "temp": "71.4\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345626.0706584,
+        "date": "2025-12-21T20:33:46.070660",
+        "target": "networking",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "7.5%",
+            "ram": "63.5%",
+            "disk": 71.9,
+            "temp": "73.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345656.309188,
+        "date": "2025-12-21T20:34:16.309189",
+        "target": "nginx",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "23.0%",
+            "ram": "63.6%",
+            "disk": 71.9,
+            "temp": "57.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345656.4365304,
+        "date": "2025-12-21T20:34:16.436532",
+        "target": "nginx",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "16.1%",
+            "ram": "63.8%",
+            "disk": 71.9,
+            "temp": "60.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345656.5537238,
+        "date": "2025-12-21T20:34:16.553726",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "21.9%",
+            "ram": "64.1%",
+            "disk": 71.9,
+            "temp": "61.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345656.681989,
+        "date": "2025-12-21T20:34:16.681990",
+        "target": "cron",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "18.8%",
+            "ram": "64.1%",
+            "disk": 71.9,
+            "temp": "62.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345656.7991593,
+        "date": "2025-12-21T20:34:16.799161",
+        "target": "networking",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "10.1%",
+            "ram": "64.1%",
+            "disk": 71.9,
+            "temp": "62.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345656.926301,
+        "date": "2025-12-21T20:34:16.926302",
+        "target": "networking",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "8.1%",
+            "ram": "64.1%",
+            "disk": 71.9,
+            "temp": "62.0\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345687.2052317,
+        "date": "2025-12-21T20:34:47.205233",
+        "target": "nginx",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "1.9%",
+            "ram": "66.3%",
+            "disk": 71.9,
+            "temp": "57.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345687.3463318,
+        "date": "2025-12-21T20:34:47.346333",
+        "target": "nginx",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "5.0%",
+            "ram": "66.4%",
+            "disk": 71.9,
+            "temp": "57.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345687.4656477,
+        "date": "2025-12-21T20:34:47.465649",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "2.5%",
+            "ram": "66.4%",
+            "disk": 71.9,
+            "temp": "57.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345687.5929525,
+        "date": "2025-12-21T20:34:47.592954",
+        "target": "cron",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "6.2%",
+            "ram": "66.4%",
+            "disk": 71.9,
+            "temp": "56.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345687.7109654,
+        "date": "2025-12-21T20:34:47.710967",
+        "target": "networking",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "3.7%",
+            "ram": "66.4%",
+            "disk": 71.9,
+            "temp": "56.8\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345687.8416762,
+        "date": "2025-12-21T20:34:47.841678",
+        "target": "networking",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "20.5%",
+            "ram": "66.4%",
+            "disk": 71.9,
+            "temp": "57.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345718.112186,
+        "date": "2025-12-21T20:35:18.112188",
+        "target": "nginx",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "12.6%",
+            "ram": "66.7%",
+            "disk": 71.9,
+            "temp": "70.4\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345718.2393756,
+        "date": "2025-12-21T20:35:18.239377",
+        "target": "nginx",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "8.9%",
+            "ram": "66.7%",
+            "disk": 71.9,
+            "temp": "70.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345718.356681,
+        "date": "2025-12-21T20:35:18.356682",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "25.0%",
+            "ram": "66.9%",
+            "disk": 71.9,
+            "temp": "70.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345718.4868562,
+        "date": "2025-12-21T20:35:18.486858",
+        "target": "cron",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "35.7%",
+            "ram": "67.4%",
+            "disk": 71.9,
+            "temp": "70.4\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345718.6049585,
+        "date": "2025-12-21T20:35:18.604959",
+        "target": "networking",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "20.1%",
+            "ram": "67.5%",
+            "disk": 71.9,
+            "temp": "70.5\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345718.7332451,
+        "date": "2025-12-21T20:35:18.733246",
+        "target": "networking",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "11.8%",
+            "ram": "67.6%",
+            "disk": 71.9,
+            "temp": "70.6\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345749.0011115,
+        "date": "2025-12-21T20:35:49.001113",
+        "target": "nginx",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "10.6%",
+            "ram": "67.4%",
+            "disk": 71.9,
+            "temp": "72.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345749.1301582,
+        "date": "2025-12-21T20:35:49.130159",
+        "target": "nginx",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "5.0%",
+            "ram": "67.4%",
+            "disk": 71.9,
+            "temp": "71.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345749.247455,
+        "date": "2025-12-21T20:35:49.247456",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "6.3%",
+            "ram": "67.4%",
+            "disk": 71.9,
+            "temp": "71.5\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345749.374822,
+        "date": "2025-12-21T20:35:49.374823",
+        "target": "cron",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "4.4%",
+            "ram": "67.4%",
+            "disk": 71.9,
+            "temp": "71.2\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345749.4929368,
+        "date": "2025-12-21T20:35:49.492939",
+        "target": "networking",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "7.6%",
+            "ram": "67.4%",
+            "disk": 71.9,
+            "temp": "70.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345749.622536,
+        "date": "2025-12-21T20:35:49.622538",
+        "target": "networking",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "6.3%",
+            "ram": "67.4%",
+            "disk": 71.9,
+            "temp": "70.8\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345779.8950026,
+        "date": "2025-12-21T20:36:19.895004",
+        "target": "nginx",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "3.1%",
+            "ram": "66.6%",
+            "disk": 71.9,
+            "temp": "46.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345780.025144,
+        "date": "2025-12-21T20:36:20.025145",
+        "target": "nginx",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "6.2%",
+            "ram": "66.6%",
+            "disk": 71.9,
+            "temp": "46.0\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345780.1422906,
+        "date": "2025-12-21T20:36:20.142292",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "5.6%",
+            "ram": "66.6%",
+            "disk": 71.9,
+            "temp": "46.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345780.2687125,
+        "date": "2025-12-21T20:36:20.268714",
+        "target": "cron",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "7.5%",
+            "ram": "66.6%",
+            "disk": 71.9,
+            "temp": "46.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345780.3868566,
+        "date": "2025-12-21T20:36:20.386858",
+        "target": "networking",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "4.4%",
+            "ram": "66.6%",
+            "disk": 71.9,
+            "temp": "46.8\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766345780.5161529,
+        "date": "2025-12-21T20:36:20.516154",
+        "target": "networking",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "11.1%",
+            "ram": "66.6%",
+            "disk": 71.9,
+            "temp": "48.8\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766534466.0018115,
+        "date": "2025-12-24T01:01:06.001814",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "15.6%",
+            "ram": "63.7%",
+            "disk": 72.6,
+            "temp": "73.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766534588.1132457,
+        "date": "2025-12-24T01:03:08.113250",
+        "target": "cron",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "17.5%",
+            "ram": "65.1%",
+            "disk": 72.6,
+            "temp": "76.6\u00b0C"
+        }
+    }
+]

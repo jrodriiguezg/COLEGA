@@ -60,24 +60,23 @@ The core (`NeoCore.py`) orchestrates several independent modules:
 
 ### 🔧 Installation
 
-The project includes an automated installation script that sets up the entire environment (Python, dependencies, services, models).
+For detailed instructions on all installation modes (Headless, Client, etc.), please refer to the [Installation Guide](public_docs/install.md).
+
+**Quick Start:**
 
 ```bash
 # Clone the repository
-git clone https://github.com/jrodriiguezg/COLEGA.git
-cd COLEGA
+git clone https://github.com/jrodriiguezg/NEO.git
+cd NEO
 
-# Run the installer
-./install.sh
+# Run the unified installer
+./install_wizard.sh
 ```
 
-The installer will perform the following actions:
-1.  Install system dependencies (`apt` or `dnf`).
-2.  Configure Python 3.10 using `pyenv`.
-3.  Create a virtual environment and install necessary libraries.
-4.  Download AI models (Vosk, Piper, Gemma, Whisper).
-5.  Configure the `systemd` service for COLEGA to start automatically.
-6.  (Optional) Configure Kiosk mode for the visual interface.
+The wizard will guide you through:
+1.  **Main Node (Full)**: Complete installation (Core + Local Web) inside a container.
+2.  **Main Node (Headless)**: Core only, optimized for servers/RPi Zero.
+3.  **Remote Web Client**: Lightweight interface to control a Main Node from another PC.
 
 ### ⚙️ Configuration
 
@@ -164,24 +163,23 @@ El núcleo (`NeoCore.py`) orquesta varios módulos independientes:
 
 ### 🔧 Instalación
 
-El proyecto incluye un script de instalación automatizado que configura todo el entorno (Python, dependencias, servicios, modelos).
+Para instrucciones detalladas sobre todos los modos de instalación (Headless, Cliente, etc.), consulta la [Guía de Instalación](public_docs/install.md).
+
+**Inicio Rápido:**
 
 ```bash
 # Clona el repositorio
-git clone https://github.com/jrodriiguezg/COLEGA.git
-cd COLEGA
+git clone https://github.com/jrodriiguezg/NEO.git
+cd NEO
 
-# Ejecuta el instalador
-./install.sh
+# Ejecuta el instalador unificado
+./install_wizard.sh
 ```
 
-El instalador realizará las siguientes acciones:
-1.  Instalará dependencias del sistema (`apt` o `dnf`).
-2.  Configurará Python 3.10 usando `pyenv`.
-3.  Creará un entorno virtual e instalará las librerías necesarias.
-4.  Descargará los modelos de IA (Vosk, Piper, Gemma, Whisper).
-5.  Configurará el servicio `systemd` para que COLEGA arranque automáticamente.
-6.  (Opcional) Configurará el modo Kiosk para la interfaz visual.
+El asistente te guiará a través de:
+1.  **Nodo Principal (Completo)**: Instalación completa (Núcleo + Web Local) en contenedor.
+2.  **Nodo Principal (Headless)**: Solo núcleo, optimizado para servidores/RPi Zero.
+3.  **Cliente Web Remoto**: Interfaz ligera para controlar un Nodo Principal desde otro PC.
 
 ### ⚙️ Configuración
 

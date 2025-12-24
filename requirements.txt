@@ -24,4 +24,15 @@ piper-tts
 padatious
 fann2
 speedtest-cli
-speedtest-cli
+
+chromadb
+sherpa-onnx
+sentence-transformers
+Flask-WTF
+transformers
+torch
+sentencepiece
+
+Flask-APScheduler
+pypdf
+SQLAlchemy

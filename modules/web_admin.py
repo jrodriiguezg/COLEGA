@@ -4,6 +4,10 @@ import functools
 import os
 import json
 import subprocess
+import time
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_wtf.csrf import CSRFProtect
+
 from modules.sysadmin import SysAdminManager
 from modules.database import DatabaseManager
 from modules.config_manager import ConfigManager
@@ -12,6 +16,8 @@ from modules.ssh_manager import SSHManager
 from modules.file_manager import FileManager
 from modules.wifi_manager import WifiManager
 from modules.dashboard_data import DashboardDataManager
+from modules.knowledge_base import KnowledgeBase
+from modules.scheduler_manager import SchedulerManager
 
 app = Flask(__name__, template_folder='../web/templates', static_folder='../web/static')
 
@@ -25,6 +31,9 @@ if not secret_key:
 
 app.secret_key = secret_key
 
+# Initialize CSRF Protection
+csrf = CSRFProtect(app)
+
 # Initialize SocketIO
 # Usamos threading para evitar conflictos con PyAudio/Threads de NeoCore
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
@@ -36,6 +45,37 @@ ssh_manager = SSHManager()
 file_manager = FileManager()
 wifi_manager = WifiManager()
 dashboard_manager = DashboardDataManager(config_manager)
+knowledge_base = KnowledgeBase() # RAG System
+scheduler_manager = SchedulerManager(app) # Task Scheduler
+
+# --- Security Headers & Middlewares ---
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+# Simple in-memory Login Rate Limiter
+login_attempts = {}
+
+def rate_limit_login(func):
+    """Limit login attempts to 5 per minute per IP."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        ip = request.remote_addr
+        now = time.time()
+        
+        # Cleanup old attempts
+        if ip in login_attempts:
+            login_attempts[ip] = [t for t in login_attempts[ip] if now - t < 60]
+            
+        if len(login_attempts.get(ip, [])) >= 5:
+            # flash('Demasiados intentos. Espera 1 minuto.', 'danger')
+            return render_template('login.html', error='Demasiados intentos. Espera 1 minuto.'), 429
+            
+        return func(*args, **kwargs)
+    return wrapper
 
 def login_required(view):
     """Decorador para proteger rutas que requieren autenticación."""
@@ -54,18 +94,35 @@ def index():
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
+@rate_limit_login
 def login():
     """Página de inicio de sesión."""
     error = None
     if request.method == 'POST':
         user = config_manager.get('admin_user', 'admin')
-        password = config_manager.get('admin_pass', 'admin')
+        stored_pass = config_manager.get('admin_pass', 'admin')
         
-        if request.form['username'] != user or request.form['password'] != password:
-            error = 'Credenciales inválidas. Inténtalo de nuevo.'
-        else:
+        # Check if stored pass is plain text (basic migration)
+        # Werkzeug hashes usually start with method (pbkdf2:...)
+        if not stored_pass.startswith(('pbkdf2:', 'scrypt:')):
+            # It's plain text, hash it immediately
+            hashed = generate_password_hash(stored_pass)
+            config_manager.set('admin_pass', hashed)
+            stored_pass = hashed
+            
+        username_input = request.form['username']
+        password_input = request.form['password']
+        
+        if username_input == user and check_password_hash(stored_pass, password_input):
             session['logged_in'] = True
             return redirect(url_for('dashboard'))
+        else:
+            # Record attempt
+            ip = request.remote_addr
+            if ip not in login_attempts: login_attempts[ip] = []
+            login_attempts[ip].append(time.time())
+            
+            error = 'Credenciales inválidas. Inténtalo de nuevo.'
     return render_template('login.html', error=error)
 
 @app.route('/logout')
@@ -87,6 +144,18 @@ def dashboard():
 def services():
     """Renderiza la página de gestión de servicios."""
     return render_template('services.html', page='services')
+
+@app.route('/docker')
+@login_required
+def docker_page():
+    """Renderiza la página de gestión de Docker."""
+    return render_template('docker.html', page='docker')
+
+@app.route('/tasks')
+@login_required
+def tasks_page():
+    """Renderiza la página de tareas programadas."""
+    return render_template('tasks.html', page='tasks')
 
 @app.route('/network')
 @login_required
@@ -148,7 +217,12 @@ def settings():
 
     if request.method == 'POST':
         config_manager.set('admin_user', request.form['username'])
-        config_manager.set('admin_pass', request.form['password'])
+        
+        # Only update password if provided and not empty
+        new_pass = request.form.get('password')
+        if new_pass and new_pass.strip():
+            config_manager.set('admin_pass', generate_password_hash(new_pass))
+            
         config_manager.set('wake_word', request.form['wake_word'])
         config_manager.set('neo_ssh_enabled', 'neo_ssh_enabled' in request.form)
         
@@ -374,6 +448,22 @@ def api_monitor_processes():
     """API que devuelve los procesos top."""
     return jsonify(sys_admin.get_top_processes())
 
+@app.route('/api/config/experimental', methods=['POST'])
+@login_required
+def update_experimental_config():
+    try:
+        data = request.json
+        feature = data.get('feature')
+        enabled = data.get('enabled')
+        
+        current = config_manager.get('experimental', {})
+        current[feature] = enabled
+        config_manager.set('experimental', current)
+        
+        return jsonify({'success': True, 'message': f'{feature} updated.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 @app.route('/api/config/save', methods=['POST'])
 @login_required
 def api_config_save():
@@ -403,32 +493,42 @@ def api_config_save():
 @app.route('/api/terminal', methods=['POST'])
 @login_required
 def api_terminal():
-    """API para ejecutar comandos de terminal con estado (cwd)."""
-    cmd = request.json.get('command')
+    """API para ejecutar comandos de terminal con estado (cwd) por sesión."""
+    data = request.json
+    cmd = data.get('command')
+    term_id = str(data.get('term_session', '1')) # Default to session 1
     
-    # Inicializar CWD si no existe
-    if 'cwd' not in session:
-        session['cwd'] = os.path.expanduser('~')
+    # Inicializar store de sesiones
+    if 'term_cwds' not in session:
+        session['term_cwds'] = {}
+        
+    # Inicializar CWD para esta sesión específica
+    if term_id not in session['term_cwds']:
+        session['term_cwds'][term_id] = os.path.expanduser('~')
+        session.modified = True 
+        
+    current_cwd = session['term_cwds'][term_id]
 
     # Seguridad básica
     if 'nano' in cmd or 'vim' in cmd or 'top' in cmd:
-        return jsonify({'success': False, 'output': 'Comandos interactivos no soportados.', 'cwd': session['cwd']})
+        return jsonify({'success': False, 'output': 'Comandos interactivos no soportados.', 'cwd': current_cwd})
     
     # Manejo especial para 'cd'
     if cmd.strip().startswith('cd '):
         target_dir = cmd.strip()[3:].strip()
         # Resolver ruta relativa
-        new_path = os.path.abspath(os.path.join(session['cwd'], target_dir))
+        new_path = os.path.abspath(os.path.join(current_cwd, target_dir))
         
         if os.path.isdir(new_path):
-            session['cwd'] = new_path
-            return jsonify({'success': True, 'output': '', 'cwd': session['cwd']})
+            session['term_cwds'][term_id] = new_path
+            session.modified = True
+            return jsonify({'success': True, 'output': '', 'cwd': new_path})
         else:
-            return jsonify({'success': False, 'output': f"cd: {target_dir}: No such file or directory", 'cwd': session['cwd']})
+            return jsonify({'success': False, 'output': f"cd: {target_dir}: No such file or directory", 'cwd': current_cwd})
     
     # Ejecutar comando normal en el CWD actual
-    success, output = sys_admin.run_command(cmd, cwd=session['cwd'])
-    return jsonify({'success': success, 'output': output, 'cwd': session['cwd']})
+    success, output = sys_admin.run_command(cmd, cwd=current_cwd)
+    return jsonify({'success': success, 'output': output, 'cwd': current_cwd})
 
 @app.route('/api/terminal/complete', methods=['POST'])
 @login_required
@@ -436,9 +536,13 @@ def api_terminal_complete():
     """API para autocompletado de archivos (Tab)."""
     data = request.json
     full_command = data.get('command', '')
+    term_id = str(data.get('term_session', '1'))
     
-    if 'cwd' not in session:
-        session['cwd'] = os.path.expanduser('~')
+    if 'term_cwds' not in session or term_id not in session['term_cwds']:
+        # Fallback
+        current_cwd = os.path.expanduser('~')
+    else:
+        current_cwd = session['term_cwds'][term_id]
     
     # Extraer la última palabra (token) que es lo que se está completando
     # Ejemplo: "ls Doc" -> "Doc"
@@ -453,7 +557,7 @@ def api_terminal_complete():
     else:
         partial = tokens[-1]
         
-    matches = sys_admin.get_file_completions(partial, session['cwd'])
+    matches = sys_admin.get_file_completions(partial, current_cwd)
     return jsonify({'matches': matches, 'partial': partial})
 
 @app.route('/api/actions', methods=['POST'])
@@ -513,6 +617,67 @@ def api_ssh_delete():
     if ssh_manager.remove_server(data['alias']):
         return jsonify({'success': True})
     return jsonify({'success': False, 'message': 'Servidor no encontrado'})
+
+# --- DOCKER API ---
+
+@app.route('/api/docker/containers', methods=['GET'])
+@login_required
+def api_docker_containers():
+    """Devuelve la lista de contenedores Docker."""
+    # Usamos format json de docker ps
+    # Referencia: docker ps --format '{{json .}}'
+    # Pero sysadmin.run_command devuelve string.
+    # Mejor parsear nosotros o usar libreria docker.
+    # Vamos a usar CLI para no añadir dependencia 'docker' python library si no es crítica.
+    
+    cmd = "docker ps -a --format '{{json .}}'"
+    success, output = sys_admin.run_command(cmd)
+    
+    if not success:
+         return jsonify([])
+         
+    containers = []
+    # Output es linea a linea json objects
+    for line in output.strip().split('\n'):
+        if line:
+            try:
+                containers.append(json.loads(line))
+            except:
+                pass
+                
+    return jsonify(containers)
+
+@app.route('/api/docker/logs', methods=['POST'])
+@login_required
+def api_docker_logs():
+    """Devuelve logs de un contenedor."""
+    container = request.json.get('id')
+    lines = request.json.get('lines', 100)
+    
+    if not container:
+        return jsonify({'success': False, 'message': 'Container ID missing'})
+        
+    cmd = f"docker logs --tail {lines} {container}"
+    success, output = sys_admin.run_command(cmd)
+    
+    # Docker logs often go to stderr
+    # run_command returns stdout+stderr combined which is good.
+    return jsonify({'logs': output})
+
+@app.route('/api/docker/control', methods=['POST'])
+@login_required
+def api_docker_control():
+    """Start/Stop/Restart container."""
+    container = request.json.get('id')
+    action = request.json.get('action') # start, stop, restart
+    
+    if action not in ['start', 'stop', 'restart']:
+        return jsonify({'success': False, 'message': 'Invalid action'})
+        
+    cmd = f"docker {action} {container}"
+    success, output = sys_admin.run_command(cmd)
+    
+    return jsonify({'success': success, 'message': output})
 
     return jsonify({'success': False, 'message': 'Servidor no encontrado'})
 
@@ -647,9 +812,69 @@ def api_nlu_train():
             with open(inbox_path, 'w') as f:
                 json.dump(inbox, f, indent=4)
                 
-        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+    
+    return jsonify({'success': True})
+
+@app.route('/api/health/status', methods=['GET'])
+@login_required
+def api_health_status():
+    """Devuelve el estado del sistema de autocuración y últimos incidentes."""
+    history_path = 'data/health_history.json'
+    recent_incidents = 0
+    last_event = "System Normal"
+    status = "Active"
+    
+    if os.path.exists(history_path):
+        try:
+            with open(history_path, 'r') as f:
+                data = json.load(f)
+                # Filter last 24h
+                now = time.time()
+                recent = [i for i in data if now - i['timestamp'] < 86400]
+                recent_incidents = len(recent)
+                
+                if data:
+                    last = data[-1]
+                    last_event = f"{last['event']} on {last['target']}"
+        except:
+             pass
+             
+    return jsonify({
+        'status': status,
+        'recent_incidents': recent_incidents,
+        'last_message': last_event
+    })
+
+# --- DASHBOARD API ---
+
+@app.route('/api/dashboard/layout', methods=['GET', 'POST'])
+@login_required
+def api_dashboard_layout():
+    """API para guardar/cargar la disposición del dashboard."""
+    layout_file = 'config/dashboard_layout.json'
+    
+    if request.method == 'POST':
+        try:
+            layout = request.json.get('layout')
+            if not isinstance(layout, list):
+                return jsonify({'success': False, 'message': 'Invalid format'})
+                
+            with open(layout_file, 'w') as f:
+                json.dump(layout, f)
+            return jsonify({'success': True})
+        except Exception as e:
+             return jsonify({'success': False, 'message': str(e)})
+             
+    else: # GET
+        if os.path.exists(layout_file):
+            try:
+                with open(layout_file, 'r') as f:
+                    return jsonify(json.load(f))
+            except:
+                return jsonify([])
+        return jsonify([])
 
 # --- FILES API ---
 
@@ -695,10 +920,150 @@ def api_visual_content():
     # pero el asistente debe poder mostrar cualquier cosa.
     return send_file(path)
 
+# --- KNOWLEDGE API ---
+
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'docs', 'brain_memory')
+
+@app.route('/api/knowledge/upload', methods=['POST'])
+@login_required
+def api_knowledge_upload():
+    """Sube un documento para la base de conocimientos."""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': 'No file part'})
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': 'No selected file'})
+        
+    if file:
+        filename = file.filename
+        # Ensure uploads folder exists
+        if not os.path.exists(UPLOAD_FOLDER):
+            os.makedirs(UPLOAD_FOLDER)
+            
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        
+        return jsonify({'success': True, 'message': 'Archivo subido a brain_memory.'})
+
+@app.route('/api/knowledge/list_docs', methods=['GET'])
+@login_required
+def api_knowledge_list_docs():
+    """Lista los documentos en la carpeta brain_memory."""
+    # Docs path is hardcoded in KnowledgeBase init to "docs" or passed via constructor.
+    # We should use the same logic. 
+    # For now, listing 'docs' dir.
+    docs_path = os.path.join(os.getcwd(), 'docs')
+    if os.path.exists(docs_path):
+         # Just list files 
+         files = []
+         for root, dirs, filenames in os.walk(docs_path):
+             for f in filenames:
+                 if f.endswith(('.txt', '.md', '.pdf')):
+                     files.append(f)
+         return jsonify(files)
+    return jsonify([])
+
+@app.route('/api/knowledge/train', methods=['POST'])
+@login_required
+def api_knowledge_train():
+    """Dispara la re-ingesta de documentos en ChromaDB."""
+    try:
+        force = request.json.get('force', False)
+        # Re-initialize to ensure it picks up new files if needed, or just call ingest
+        # knowledge_base is global
+        knowledge_base.ingest_docs(force=force)
+        return jsonify({'success': True, 'message': 'Entrenamiento completado.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+# --- SCHEDULER API ---
+
+@app.route('/api/tasks/list', methods=['GET'])
+@login_required
+def api_tasks_list():
+    return jsonify(scheduler_manager.get_jobs())
+
+@app.route('/api/tasks/add', methods=['POST'])
+@login_required
+def api_tasks_add():
+    data = request.json
+    name = data.get('name')
+    command = data.get('command')
+    cron = data.get('cron') # "min hour day month dow"
+    
+    success, msg = scheduler_manager.add_bash_job(name, command, cron)
+    return jsonify({'success': success, 'message': msg})
+
+@app.route('/api/tasks/delete', methods=['POST'])
+@login_required
+def api_tasks_delete():
+    data = request.json
+    job_id = data.get('id')
+    success, msg = scheduler_manager.delete_job(job_id)
+    return jsonify({'success': success, 'message': msg})
+
+
+@app.route('/api/knowledge/delete_doc', methods=['POST'])
+@login_required
+def api_knowledge_delete_doc():
+    """Borra un documento."""
+    filename = request.json.get('filename')
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'message': 'File not found'})
+
+@app.route('/api/config/get', methods=['GET'])
+@login_required
+def api_config_get():
+    """Devuelve la configuración completa y listas de modelos disponibles."""
+    config = config_manager.get_all()
+    
+    # List available voices
+    voices_dir = os.path.join(os.getcwd(), 'piper', 'voices')
+    available_voices = []
+    if os.path.exists(voices_dir):
+        for f in os.listdir(voices_dir):
+            if f.endswith('.onnx'):
+                available_voices.append(f)
+    
+    # List available AI models (GGUF)
+    models_dir = os.path.join(os.getcwd(), 'models')
+    available_models = []
+    if os.path.exists(models_dir):
+        for f in os.listdir(models_dir):
+            if f.endswith('.gguf'):
+                available_models.append(f)
+                
+    return jsonify({
+        'config': config,
+        'voices': available_voices,
+        'models': available_models
+    })
+
 def run_server():
     """Inicia el servidor Flask con SocketIO."""
     import logging
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
-    # Usamos socketio.run en lugar de app.run
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    
+    host = '0.0.0.0'
+    port = 5000
+    
+    # Check for SSL Certs
+    cert_dir = os.path.join(os.getcwd(), 'config', 'certs')
+    cert_file = os.path.join(cert_dir, 'neo.crt')
+    key_file = os.path.join(cert_dir, 'neo.key')
+    
+    ssl_context = None
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        print(f"🔒 HTTPS Enabled. Using certs from {cert_dir}")
+        ssl_context = (cert_file, key_file)
+    else:
+        print("⚠️  HTTPS Disabled. Certs not found in config/certs/")
+        
+    print(f"🚀 Neo Web Admin running on https://{host}:{port}" if ssl_context else f"🚀 Neo Web Admin running on http://{host}:{port}")
+    
+    socketio.run(app, host=host, port=port, allow_unsafe_werkzeug=True, ssl_context=ssl_context)

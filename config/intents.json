@@ -8,7 +8,8 @@
         "buenas tardes",
         "qué tal",
         "estás ahí",
-        "despierta"
+        "despierta",
+        "qué pasa"
       ],
       "action": "responder_simple",
       "responses": [
@@ -16,6 +17,35 @@
         "Dime, máquina. ¿Qué se ha roto hoy?",
         "Aquí T.I.O. al aparato. ¿En qué te echo un cable?",
         "¡Ese admin bueno! ¿Qué tal todo, bro?"
+      ]
+    },
+    {
+      "name": "docker_status",
+      "triggers": [
+        "estado de los contenedores",
+        "qué contenedores hay",
+        "lista los dockers",
+        "cómo van los contenedores"
+      ],
+      "action": "docker_skill.consultar_estado",
+      "responses": [
+        "Voy a mirar el puerto de carga..."
+      ]
+    },
+    {
+      "name": "docker_action",
+      "triggers": [
+        "reinicia el contenedor",
+        "para el docker",
+        "arranca el contenedor",
+        "reiniciar contenedor",
+        "parar contenedor",
+        "iniciar contenedor",
+        "actúa sobre el contenedor"
+      ],
+      "action": "docker_skill.accion_contenedor",
+      "responses": [
+        "Oído cocina."
       ]
     },
     {

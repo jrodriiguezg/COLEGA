@@ -17,6 +17,11 @@ class DatabaseManager:
             try:
                 self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
                 self.conn.row_factory = sqlite3.Row
+                # --- Performance Optimizations ---
+                self.conn.execute("PRAGMA journal_mode=WAL;") # Write-Ahead Logging for concurrency
+                self.conn.execute("PRAGMA synchronous=NORMAL;") # Faster writes, safe enough for WAL
+                self.conn.execute("PRAGMA cache_size=-2000;") # Limit cache to ~2MB
+                self.conn.execute("PRAGMA foreign_keys=ON;") 
             except sqlite3.Error as e:
                 logger.error(f"Error connecting to database: {e}")
         return self.conn

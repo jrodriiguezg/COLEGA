@@ -205,17 +205,41 @@ $VENV_DIR/bin/pip install -r requirements.txt
 echo "Librerías de Python instaladas correctamente."
 echo ""
 
-# --- 3.1. INICIALIZACIÓN DE LA BASE DE DATOS ---
-echo "[PASO 3.1/5] Inicializando base de datos (Neo Brain)..."
+# --- 3.1. PREPARACIÓN DE DIRECTORIOS ---
+echo "[PASO 3.1/5] Preparando estructura de directorios..."
+
+# Directorios críticos
+DIRS=(
+    "logs"
+    "config"
+    "database"
+    "models"
+    "piper/voices"
+    "docs/brain_memory"
+)
+
+for dir in "${DIRS[@]}"; do
+    if [ ! -d "$dir" ]; then
+        echo "Creando directorio: $dir"
+        mkdir -p "$dir"
+    fi
+    # Asegurar permisos del usuario actual (no root) si se creó con sudo antes
+    chown -R $(whoami):$(whoami) "$dir" 2>/dev/null || true
+    chmod 775 "$dir"
+done
+
+# --- 3.2. INICIALIZACIÓN DE LA BASE DE DATOS ---
+echo "[PASO 3.2/5] Inicializando base de datos (Neo Brain)..."
 export PYTHONPATH=$(pwd)
 $VENV_DIR/bin/python database/init_db.py
-# Asegurar permisos correctos para el usuario actual (que ejecutará el servicio)
+
+# Asegurar permisos en db
 if [ -f "database/brain.db" ]; then
     chown $(whoami):$(whoami) database/brain.db
     chmod 664 database/brain.db
-    echo "Base de datos inicializada y permisos configurados."
+    echo "Base de datos verificada."
 else
-    echo "ADVERTENCIA: No se pudo crear brain.db"
+    echo "ADVERTENCIA: No se pudo verificar database/brain.db"
 fi
 echo ""
 
@@ -260,6 +284,15 @@ if [ -f "resources/tools/download_whisper_model.py" ]; then
     $VENV_DIR/bin/python resources/tools/download_whisper_model.py
 else
     echo "ERROR: No se encontró resources/tools/download_whisper_model.py"
+fi
+echo ""
+
+# --- 4.4. DESCARGA DEL MODELO MANGO T5 (NL2BASH) ---
+echo "[PASO 4.4/5] Descargando modelo MANGO T5 (SysAdmin AI)..."
+if [ -f "resources/tools/download_mango_model.py" ]; then
+    $VENV_DIR/bin/python resources/tools/download_mango_model.py
+else
+    echo "ERROR: No se encontró resources/tools/download_mango_model.py"
 fi
 echo ""
 
@@ -365,6 +398,53 @@ echo "El servicio se ha configurado en modo USUARIO."
 echo "Logs: journalctl --user -u neo.service -f"
 echo ""
 
+# --- 5.1 SEGURIDAD (SSL & PASSWORD) ---
+echo "[PASO 5.1/5] Configurando seguridad..."
+
+# 1. Generar Certificados SSL
+CERT_DIR="$(pwd)/config/certs"
+mkdir -p "$CERT_DIR"
+
+if [ ! -f "$CERT_DIR/neo.key" ]; then
+    echo "Generando certificados SSL autofirmados..."
+    # Check for openssl
+    if command -v openssl >/dev/null 2>&1; then
+        openssl req -x509 -newkey rsa:4096 -keyout "$CERT_DIR/neo.key" -out "$CERT_DIR/neo.crt" -days 3650 -nodes -subj "/C=ES/ST=Madrid/L=Madrid/O=NeoCore/CN=$(hostname)"
+        
+        # Set permissions
+        chown $(whoami):$(whoami) "$CERT_DIR/neo.key" "$CERT_DIR/neo.crt"
+        chmod 600 "$CERT_DIR/neo.key"
+        chmod 644 "$CERT_DIR/neo.crt"
+        
+        echo "✅ Certificado generado en: $CERT_DIR"
+        echo "   -> Importa 'neo.crt' en tu navegador para evitar advertencias."
+    else
+        echo "⚠️  OpenSSL no encontrado. No se pudo generar certificado SSL."
+    fi
+else
+    echo "Certificados SSL ya existen."
+fi
+
+# 2. Configurar Contraseña Admin
+echo "Configurando credenciales de administración..."
+if [ -f "resources/tools/password_helper.py" ]; then
+    # Create default config if not exists to avoid errors
+    if [ ! -f "config/config.json" ]; then
+        echo "{}" > config/config.json
+    fi
+    
+    # Run helper
+    # We use a default first, but could prompt interactively if installer was interactive.
+    # Since this script might be run non-interactively, we'll set a default ONLY IF not set.
+    # But for better security, let's force a hash of 'admin' if nothing exists.
+    
+    echo "Estableciendo contraseña predeterminada ('admin')... ¡Cmbiala luego!"
+    $VENV_DIR/bin/python resources/tools/password_helper.py --user admin --password admin
+else
+    echo "⚠️  Helper de contraseñas no encontrado."
+fi
+echo ""
+
 # --- 6. CONFIGURACIÓN DE AUTO-LOGIN Y KIOSK (GUI) ---
 echo "[PASO 6/5] Configurando Auto-login y modo Kiosk..."
 
@@ -452,3 +532,21 @@ echo "----------------------------------------------------------------"
 echo ""
 
 echo "🎉 ¡Instalación completada!"
+echo ""
+
+# --- 7. HARDENING OPCIONAL ---
+if [ -f "resources/tools/secure_system.sh" ]; then
+    echo "----------------------------------------------------------------"
+    echo "¿Quieres aplicar medidas de seguridad adicionales al sistema?"
+    echo "Esto instalará UFW (Firewall), Fail2Ban y restringirá permisos de archivos."
+    echo "Recomendado si este dispositivo está expuesto a red."
+    echo "----------------------------------------------------------------"
+    read -p "¿Ejecutar hardening de seguridad? (s/n) " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Ss]$ ]]; then
+        sudo ./resources/tools/secure_system.sh
+    else
+        echo "Saltando hardening. Puedes ejecutarlo luego con: sudo resources/tools/secure_system.sh"
+    fi
+fi
+echo ""

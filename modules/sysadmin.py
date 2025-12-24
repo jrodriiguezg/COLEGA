@@ -94,12 +94,34 @@ class SysAdminManager:
 
     # --- NUEVAS FUNCIONALIDADES (PHASE 8) ---
 
-    def get_services(self):
+    def is_service_installed(self, service_name):
+        """Comprueba si un servicio existe en el sistema (instalado/loaded)."""
+        try:
+            # Opción 1: Check unit file presence
+            # systemctl list-unit-files <name>*
+            cmd = subprocess.run(
+                ['systemctl', 'list-unit-files', f'{service_name}*', '--no-pager'], 
+                capture_output=True, text=True
+            )
+            # Si el servicio aparece en la salida, existe.
+            # Ojo: '0 unit files listed' indica que no existe.
+            return service_name in cmd.stdout
+        except Exception:
+            return False
+
+    def get_services(self, services=None):
         """
-        Devuelve el estado de una lista predefinida de servicios clave.
+        Devuelve el estado de una lista de servicios key.
+        Si se pasa una lista 'services', consulta esos. Si no, usa defaults.
         Retorna una lista de diccionarios: [{'name': 'ssh', 'status': 'active'}, ...]
         """
-        services = ['ssh', 'docker', 'nginx', 'openkompai', 'cron', 'networking']
+        if services is None:
+            services = [
+                'ssh', 'docker', 'nginx', 'apache2', 'mosquitto', 'ollama', 
+                'openkompai', 'cron', 'networking', 'NetworkManager',
+                'mysql', 'mariadb', 'fail2ban', 'bluetooth'
+            ]
+            
         status_list = []
         
         for srv in services:

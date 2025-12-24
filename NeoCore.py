@@ -12,7 +12,7 @@ from functools import lru_cache
 # --- Módulos Internos ---
 from modules.logger import app_logger
 from modules.speaker import Speaker
-from modules.calendar import CalendarManager
+from modules.calendar_manager import CalendarManager
 from modules.alarms import AlarmManager
 from modules.config_manager import ConfigManager
 from modules.skills.system import SystemSkill
@@ -23,6 +23,9 @@ from modules.skills.media import MediaSkill
 from modules.skills.organizer import OrganizerSkill
 from modules.skills.ssh import SSHSkill
 from modules.skills.files import FilesSkill
+from modules.skills.files import FilesSkill
+from modules.skills.docker import DockerSkill
+from modules.skills.diagnosis import DiagnosisSkill
 from modules.ssh_manager import SSHManager
 from modules.wifi_manager import WifiManager
 from modules.wifi_manager import WifiManager
@@ -40,6 +43,9 @@ from modules.intent_manager import IntentManager
 from modules.ai_engine import AIEngine
 from modules.chat import ChatManager
 from modules.keyword_router import KeywordRouter
+from modules.biometrics_manager import BiometricsManager
+from modules.mango_manager import MangoManager
+from modules.health_manager import HealthManager
 
 # --- Módulos Opcionales ---
 try:
@@ -55,7 +61,9 @@ except ImportError:
 try:
     from modules.web_admin import run_server, update_face
     WEB_ADMIN_DISPONIBLE = True
-except ImportError:
+    WEB_ADMIN_DISPONIBLE = True
+except ImportError as e:
+    app_logger.error(f"No se pudo importar Web Admin: {e}")
     WEB_ADMIN_DISPONIBLE = False
     update_face = None
 
@@ -89,12 +97,14 @@ class NeoCore:
     Orquesta VoiceManager, IntentManager, AI Engine y Skills.
     """
     def __init__(self):
-        app_logger.info("Iniciando Neo Core (AIEngine Edition)...")
+        # --- Asignar Logger al objeto para que los Skills lo usen ---
+        self.app_logger = app_logger
+        self.app_logger.info("Iniciando Neo Core (AIEngine Edition)...")
 
         try:
             locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
         except locale.Error:
-            app_logger.warning("Localización 'es_ES.UTF-8' no encontrada. Usando configuración por defecto.")
+            self.app_logger.warning("Localización 'es_ES.UTF-8' no encontrada. Usando configuración por defecto.")
             # --- Configuración ---
             CONFIG_FILE = "config/config.json"
             try:
@@ -106,6 +116,8 @@ class NeoCore:
         self.speaker = Speaker(self.event_queue)
         self.config_manager = ConfigManager()
         self.config = self.config_manager.get_all()
+        # --- Alias para compatibilidad con Skills ---
+        self.skills_config = self.config.get('skills', {})
         
         # --- AI & Core Managers ---
         model_path = self.config.get('ai_model_path')
@@ -119,6 +131,13 @@ class NeoCore:
             update_face
         )
         self.chat_manager = ChatManager(self.ai_engine)
+        self.biometrics_manager = BiometricsManager(self.config_manager)
+        self.mango_manager = MangoManager() # Initialize MANGO T5
+        self.health_manager = HealthManager(self.config_manager)
+
+        
+        # Start RAG Ingestion in background
+        threading.Thread(target=self.chat_manager.knowledge_base.ingest_docs, daemon=True).start()
 
         # --- Legacy Managers ---
         self.calendar_manager = CalendarManager()
@@ -135,14 +154,14 @@ class NeoCore:
                 self.vision_manager = VisionManager(self.event_queue)
                 self.vision_manager.start()
             except ImportError as e:
-                app_logger.error(f"No se pudo cargar VisionManager (cv2 missing?): {e}")
+                self.app_logger.error(f"No se pudo cargar VisionManager (cv2 missing?): {e}")
                 self.vision_manager = None
             except Exception as e:
-                app_logger.error(f"Error fatal iniciando VisionManager: {e}")
+                self.app_logger.error(f"Error fatal iniciando VisionManager: {e}")
                 self.vision_manager = None
         else:
             self.vision_manager = None
-            app_logger.info("VisionManager deshabilitado por configuración (evita Segfaults).")
+            self.app_logger.info("VisionManager deshabilitado por configuración (evita Segfaults).")
         self.file_manager = FileManager()
         self.cast_manager = CastManager()
         self.cast_manager.start_discovery() # Start looking for TVs/Speakers
@@ -150,9 +169,17 @@ class NeoCore:
         # --- AI Engine (Gemma 2B) ---
         # self.ai_engine already initialized above
         
-        # --- BRAIN (Memory & Learning) ---
+        # --- BRAIN (Memory & Learning & RAG DB) ---
         self.brain = Brain()
         self.brain.set_ai_engine(self.ai_engine) # Inject AI for consolidation
+        # --- Alias DB for FilesSkill (using Brain's DB Manager) ---
+        # Si Brain tiene un db_manager, lo exponemos como self.db
+        if self.brain and hasattr(self.brain, 'db'):
+             self.db = self.brain.db
+        else:
+             # Fallback: intentar cargar la base de datos manualmente o mock
+             self.db = None
+             self.app_logger.warning("No se ha podido vincular self.db (Brain DB Manager). FilesSkill podría fallar.")
         
         # --- Chat Manager (Personality & History) ---
         self.chat_manager = ChatManager(self.ai_engine)
@@ -179,6 +206,9 @@ class NeoCore:
         self.skills_organizer = OrganizerSkill(self)
         self.skills_ssh = SSHSkill(self)
         self.skills_files = FilesSkill(self)
+        self.skills_files = FilesSkill(self)
+        self.skills_docker = DockerSkill(self)
+        self.skills_diagnosis = DiagnosisSkill(self)
         
         self.vlc_instance, self.player = self.setup_vlc()
         
@@ -197,6 +227,9 @@ class NeoCore:
         
         self.waiting_for_alarm_confirmation = False
         self.pending_alarm_data = None
+
+        self.pending_mango_command = None # For confirming potentially dangerous shell commands
+        
         
         self.waiting_for_learning = None # Stores the key we are trying to learn
         self.pending_suggestion = None # Stores the ambiguous intent we are asking about
@@ -243,6 +276,8 @@ class NeoCore:
             self.mqtt_manager.stop()
         if self.bluetooth_manager:
             self.bluetooth_manager.stop()
+        if self.health_manager:
+            self.health_manager.stop()
         os._exit(0)
 
     def start_background_tasks(self):
@@ -260,6 +295,9 @@ class NeoCore:
         if WEB_ADMIN_DISPONIBLE:
             threading.Thread(target=run_server, daemon=True).start()
             app_logger.info("Servidor Web Admin iniciado en segundo plano.")
+
+        # 5. Self-Healing
+        self.health_manager.start()
 
     def on_voice_command(self, command, wake_word):
         """Callback cuando VoiceManager detecta voz."""
@@ -305,6 +343,10 @@ class NeoCore:
                 if self.waiting_for_alarm_confirmation:
                     self.handle_alarm_confirmation(command_text)
                     return
+                if self.pending_mango_command:
+                    self.handle_mango_confirmation(command_text)
+                    return
+
                 if self.waiting_for_learning:
                     self.handle_learning_response(command_text)
                     return
@@ -424,8 +466,29 @@ class NeoCore:
                         pass
                     return
                 
+                # --- MANGO T5 Check (NL2Bash) ---
+                # Only if text looks like a technical request and IntentManager failed
+                mango_cmd, mango_conf = self.mango_manager.infer(command_text)
+                if mango_cmd and mango_conf > 0.6: 
+                     # Check if command is obviously safe (whitelist)
+                     if mango_cmd.startswith("echo ") or mango_cmd == "ls" or mango_cmd.startswith("ls "):
+                         # Safe execution
+                         self.speak(f"Ejecutando: {mango_cmd}")
+                         success, output = self.sysadmin_manager.run_command(mango_cmd)
+                         result_text = output if success else f"Error: {output}"
+                         # Let ChatManager wrap the result
+                         self.handle_action_result_with_chat(command_text, result_text)
+                         return
+                     else:
+                         # Hazardous execution -> Ask for confirmation
+                         self.pending_mango_command = mango_cmd
+                         self.speak(f"He generado el comando: {mango_cmd}. ¿Quieres que lo ejecute?")
+                         return
+
                 # Si no es un comando, hablar con Gemma
                 self.handle_unrecognized_command(command_text)
+                
+
 
             except Exception as e:
                 app_logger.error(f"Error CRÍTICO en handle_command: {e}", exc_info=True)
@@ -550,6 +613,15 @@ class NeoCore:
                 if update_face: update_face('idle')
                 self.active_listening_end_time = 0
 
+            # Watchdog: Check if Voice Thread is alive
+            if self.voice_manager.is_listening:
+                 if not hasattr(self.voice_manager, 'listener_thread') or not self.voice_manager.listener_thread.is_alive():
+                     self.app_logger.warning("🚨 Watchdog: Voice Thread Died! Restarting...")
+                     self.voice_manager.stop_listening() # Reset flags
+                     time.sleep(1)
+                     self.voice_manager.start_listening(self.intent_manager.intents)
+                     self.app_logger.info("✅ Watchdog: Voice Thread Restarted.")
+
             time.sleep(1) # Reduced sleep for better responsiveness
 
     def _check_frequent_tasks(self):
@@ -584,6 +656,7 @@ class NeoCore:
             "system_restart_service": self.skills_system.restart_service,
             "system_update": self.skills_system.update_system,
             "system_find_file": self.skills_system.find_file,
+            "realizar_diagnostico": self.skills_diagnosis.realizar_diagnostico,
             
             # --- Time & Date ---
             "decir_hora_actual": self.skills_time.decir_hora_fecha,

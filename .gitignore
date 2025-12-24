@@ -11,7 +11,7 @@ tio.venv/
 unsloth_env/
 pip-log.txt
 pip-delete-this-directory.txt
-
+temp.json
 # User Data & Database
 brain.db
 *.sqlite
@@ -51,8 +51,12 @@ MNB/
 experiments/
 *.ipynb
 sounds/
-docs/
+docker/
 .tools/
+MANGOT5/
+MANGOT5.old/
+config/certs/
+
 source/
 roadmap.md
 test_pipeline.py
@@ -60,7 +64,8 @@ COLEGA.code-workspace
 
 # Tests
 tests/
-
+test_rag_temp.py
+venv_distrobox
 # Hardware/Specific Modules
 esp32_cam/
 

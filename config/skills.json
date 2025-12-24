@@ -5,7 +5,7 @@
     },
     "network": {
         "enabled": true,
-        "description": "Herramientas de red (ping, escaneo, IP pública, cluster).",
+        "description": "Herramientas de red (ping, escaneo, IP p\u00fablica, cluster).",
         "config": {
             "aliases": {
                 "router": "192.168.1.1",
@@ -19,31 +19,32 @@
     },
     "media": {
         "enabled": true,
-        "description": "Reproducción de música, radio y control de medios (Cast)."
+        "description": "Reproducci\u00f3n de m\u00fasica, radio y control de medios (Cast)."
     },
     "content": {
         "enabled": true,
-        "description": "Entretenimiento: chistes, curiosidades, frases célebres y aprendizaje."
+        "description": "Entretenimiento: chistes, curiosidades, frases c\u00e9lebres y aprendizaje."
     },
     "organizer": {
         "enabled": true,
-        "description": "Gestión personal: alarmas, temporizadores y recordatorios."
+        "description": "Gesti\u00f3n personal: alarmas, temporizadores y recordatorios."
     },
     "ssh": {
         "enabled": true,
-        "description": "Gestión remota de servidores vía SSH.",
+        "description": "Gesti\u00f3n remota de servidores v\u00eda SSH.",
         "config": {
             "servers": []
         }
     },
     "files": {
         "enabled": true,
-        "description": "Búsqueda y lectura de archivos en el sistema.",
+        "description": "B\u00fasqueda y lectura de archivos en el sistema.",
         "config": {
+            "enable_indexing": true,
+            "scan_interval": 24,
             "scan_paths": [
                 "~/"
             ],
-            "scan_interval": 24,
             "scan_types": [
                 "txt",
                 "pdf",
@@ -52,8 +53,7 @@
                 "jpg",
                 "png",
                 "json"
-            ],
-            "enable_indexing": false
+            ]
         }
     }
 }

@@ -50,7 +50,9 @@ class AIEngine:
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=n_ctx, 
-                n_threads=3, 
+                n_threads=3, # Keep 3 threads for i3 (usually 2 cores/4 threads or 4 cores)
+                n_batch=512, # Optimized batch size
+                use_mmap=True, # Allow OS to manage memory paging
                 verbose=False
             )
             

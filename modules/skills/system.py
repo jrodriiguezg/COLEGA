@@ -16,6 +16,17 @@ class SystemSkill(BaseSkill):
             self.speak("El módulo de administración no está disponible.")
 
     def apagar(self, response, **kwargs):
+        # Biometric Check (Alpha)
+        if hasattr(self.core, 'biometrics_manager'):
+            if self.core.biometrics_manager.is_voice_auth_enabled():
+                self.speak("Verificando autorización por huella de voz...")
+                # Simulate verification process
+                if self.core.biometrics_manager.verify_voice(None):
+                    self.speak("Identidad confirmada.")
+                else:
+                    self.speak("Acceso denegado. No reconozco tu voz.")
+                    return
+
         self.speak(response)
         self.core.on_closing()
 

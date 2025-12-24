@@ -15,7 +15,7 @@ from modules.config_manager import ConfigManager
 from modules.logger import app_logger
 
 # Managers
-from modules.calendar import CalendarManager
+from modules.calendar_manager import CalendarManager
 from modules.alarms import AlarmManager
 from modules.ssh_manager import SSHManager
 from modules.wifi_manager import WifiManager
