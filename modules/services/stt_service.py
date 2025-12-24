@@ -64,8 +64,22 @@ class STTService:
             logger.error("Vosk not installed.")
             return
         
-        model_path = self.config.get('model_path', "vosk-models/es")
-        if os.path.exists(model_path):
+        # Search paths for Vosk model
+        possible_paths = [
+            self.config.get('model_path'),
+            "vosk-models/es",
+            "resources/vosk-models/es",
+            "/usr/share/vosk/models/es"
+        ]
+        
+        model_path = None
+        for p in possible_paths:
+            if p and os.path.exists(p):
+                model_path = p
+                logger.info(f"Found Vosk model at: {model_path}")
+                break
+        
+        if model_path:
             try:
                 self.vosk_model = vosk.Model(model_path)
                 self.vosk_recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000)
@@ -73,7 +87,7 @@ class STTService:
             except Exception as e:
                 logger.error(f"Failed to load Vosk: {e}")
         else:
-            logger.warning(f"Vosk model not found at {model_path}")
+            logger.error(f"Vosk model not found in any of: {possible_paths}")
 
     def setup_sherpa(self):
         if not SHERPA_AVAILABLE:
