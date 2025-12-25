@@ -315,14 +315,33 @@ class SkillsService:
             command, confidence = self.mango_manager.infer(utterance)
             
             # Threshold matches user preference for Mango priority
-            if command and confidence > 0.6: 
+            if command and confidence >= 0.8: 
                 logger.info(f"Mango identified command: {command} (Conf: {confidence})")
-                self.bus.emit('speak', {'text': f"Entendido, ejecutaré: {command}"})
                 
-                # TODO: Execute command? For now we just acknowledge it as requested.
-                # Ideally we would pass this to a skill that handles execution safely.
-                # self.skills_system.execute_bash(command) 
+                if self.sysadmin_manager:
+                    self.bus.emit('speak', {'text': f"Ejecutando: {command}"})
+                    
+                    # Security Check (Basic)
+                    forbidden = ["rm ", "mkfs", "dd ", ">", "mv ", "shutdown", "reboot"]
+                    if any(bad in command for bad in forbidden):
+                        self.bus.emit('speak', {'text': "Comando bloqueado por seguridad."})
+                        return
+
+                    success, output = self.sysadmin_manager.run_command(command)
+                    if success:
+                        # Limit output speech
+                        if len(output) < 150:
+                            self.bus.emit('speak', {'text': f"Salida: {output}"})
+                        else:
+                            self.bus.emit('speak', {'text': "Comando ejecutado. La salida es muy larga, revisa el log."})
+                    else:
+                        self.bus.emit('speak', {'text': "Error en la ejecución."})
+                else:
+                    self.bus.emit('speak', {'text': f"Entendido, orden: {command}. Pero no tengo módulo de administración."})
+                
                 return
+            else:
+                 logger.info(f"Mango ignored input (Conf: {confidence}). Falling back to Gemma.")
 
         # 2. Fallback to Chat (Gemma)
         logger.info(f"Chatting with AI: {utterance}")

@@ -106,10 +106,25 @@ class MangoManager:
             sequence_score = outputs.sequences_scores[0].item()
             length = len(outputs.sequences[0])
             confidence = 0.0
-             # Normalizing somewhat arbitrarily for T5 since scores are negative log probs
-            if sequence_score > -2.0: confidence = 0.95
-            elif sequence_score > -5.0: confidence = 0.8
+            
+            # --- Filtering ---
+            # Penalize known chat phrases or very short non-commands
+            ignored_phrases = ["hola", "gracias", "entendido", "me he entendido", "buenos dias", "adios", "que tal"]
+            if input_text.lower() in ignored_phrases or len(input_text.split()) < 2:
+                 # Unless it's a known single-word command like "reboot" (which usually needs auth anyway), ignore it
+                 # For safety, we drop confidence for these generic inputs
+                 confidence = 0.0
+                 logger.info(f"Input '{input_text}' filtered as likely chat/noise.")
+                 return None, 0.0
+
+            # Normalizing somewhat arbitrarily for T5 since scores are negative log probs
+            # T5 scores are usually around -1.0 to -8.0
+            if sequence_score > -1.5: confidence = 0.98
+            elif sequence_score > -3.0: confidence = 0.9
+            elif sequence_score > -5.0: confidence = 0.75
             else: confidence = 0.5
+            
+            logger.info(f"Raw Score: {sequence_score}")
 
             logger.info(f"MANGO Input: '{text}' -> Output: '{command}' (Score: {sequence_score:.2f})")
             
