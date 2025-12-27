@@ -329,19 +329,28 @@ class SkillsService:
 
                     success, output = self.sysadmin_manager.run_command(command)
                     if success:
-                        # Limit output speech
-                        if len(output) < 150:
+                        # Smart Summary for TTS
+                        lines = output.strip().split('\n')
+                        
+                        if len(output) < 300 and len(lines) <= 5:
+                            # Short enough to read fully
                             self.bus.emit('speak', {'text': f"Salida: {output}"})
                         else:
-                            # Save to file
-                            filename = f"/home/{os.environ.get('USER', 'jrodriiguezg')}/resultado_comando.txt"
+                            # Too long, read summary
+                            preview = ". ".join(lines[:3]) # Read first 3 lines
+                            remaining = len(lines) - 3
+                            
+                            # Save full output
+                            filename = os.path.join(os.path.expanduser("~"), "resultado_comando.txt")
                             try:
                                 with open(filename, 'w') as f:
                                     f.write(output)
-                                self.bus.emit('speak', {'text': f"La salida es muy larga. La he guardado en {filename}."})
+                                
+                                speak_text = f"Salida: {preview}. Y {remaining} líneas más. Todo guardado en {filename}."
+                                self.bus.emit('speak', {'text': speak_text})
                             except Exception as e:
-                                logger.error(f"Error executing command: {e}")
-                                self.bus.emit('speak', {'text': "Comando ejecutado, pero fallé al guardar el log."})
+                                logger.error(f"Error saving log: {e}")
+                                self.bus.emit('speak', {'text': f"Salida: {preview}. Y más texto que no pude guardar."})
                     else:
                         self.bus.emit('speak', {'text': "Error en la ejecución."})
                 else:

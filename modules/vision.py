@@ -159,3 +159,35 @@ class VisionManager:
             
             print(f"Vision: Identified {name}")
             self.event_queue.put({'type': 'vision_identify', 'name': name})
+
+    def learn_user(self, name):
+        """
+        Attempts to learn a new face from the current video stream.
+        Returns: (success, message)
+        """
+        if not self.video_capture or not self.video_capture.isOpened():
+            return False, "Cámara no disponible."
+
+        # Capture a fresh frame
+        ret, frame = self.video_capture.read()
+        if not ret:
+            return False, "No pude capturar imagen."
+
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        face_locations = face_recognition.face_locations(rgb_frame)
+        
+        if len(face_locations) == 0:
+            return False, "No veo ninguna cara."
+        
+        if len(face_locations) > 1:
+            return False, "Veo demasiadas caras. Ponte tú solo."
+
+        # Generate encoding
+        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+        if len(face_encodings) > 0:
+            encoding = face_encodings[0]
+            self.face_db.add_face(name, encoding)
+            print(f"Vision: Learned face for {name}")
+            return True, f"Cara de {name} guardada correctamente."
+            
+        return False, "Error al procesar la cara."

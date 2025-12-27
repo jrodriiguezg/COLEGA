@@ -49,7 +49,7 @@ class NLUService:
         # 1. Try Padatious (Primary)
         if self.padatious_manager.available:
             pad_result = self.padatious_manager.calc_intent(text)
-            if pad_result and pad_result['confidence'] > 0.5:
+            if pad_result and pad_result['confidence'] > 0.75:
                 logger.info(f"Padatious Match: {pad_result['name']} ({pad_result['score']}%)")
                 best_intent = pad_result
         

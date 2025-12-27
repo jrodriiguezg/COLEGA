@@ -376,6 +376,25 @@ class NeoCore:
                 if not command_text:
                     return
 
+                # --- 0. FACE LEARNING (Priority High) ---
+                # Check for "Soy {name}" or "Aprende mi cara"
+                import re
+                match_learn = re.search(r"(?:soy|me llamo|mi nombre es)\s+(.+)", command_text, re.IGNORECASE)
+                if match_learn:
+                    name = match_learn.group(1).strip()
+                    # Filter out purely conversational fillers if needed, but for now take the capture
+                    if self.vision_manager:
+                        self.speak(f"Hola {name}. Mírame a la cámara mientras aprendo tu cara...")
+                        # Run in background to not block
+                        def learn_task():
+                             success, msg = self.vision_manager.learn_user(name)
+                             self.speak(msg)
+                        threading.Thread(target=learn_task).start()
+                        return
+                    else:
+                        self.speak("Lo siento, mis sistemas de visión no están activos.")
+                        return
+
                 # --- 1. MANGO T5 (SysAdmin AI) - PRIMARY ENGINE ---
                 # Check this FIRST to prioritize Model over Rules (Intents)
                 
