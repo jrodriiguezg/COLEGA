@@ -22,7 +22,7 @@ paho-mqtt
 faster-whisper
 piper-tts
 padatious
-fann2
+# fann2
 speedtest-cli
 
 chromadb

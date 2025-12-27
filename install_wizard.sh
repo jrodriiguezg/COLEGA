@@ -44,7 +44,14 @@ case $OPCION in
         echo -e "${YELLOW}Instalando Cliente Web Remoto...${NC}"
         
         read -p "IP del Servidor NeoCore (ej: http://192.168.1.50:5000): " NEO_IP
-        if [ -z "$NEO_IP" ]; then NEO_IP="http://localhost:5000"; fi
+        if [ -z "$NEO_IP" ]; then 
+            NEO_IP="http://localhost:5000"
+        else
+            # Prepend http:// if missing
+            if [[ ! "$NEO_IP" =~ ^http:// ]] && [[ ! "$NEO_IP" =~ ^https:// ]]; then
+                NEO_IP="http://$NEO_IP"
+            fi
+        fi
         
         echo "Configurando cliente para conectar a $NEO_IP..."
         

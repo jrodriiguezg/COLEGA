@@ -58,6 +58,7 @@ sounds/
 docker/
 .tools/
 MANGOT5/
+MANGOT52.old/
 MANGOT5.old/
 config/certs/
 FANN/
@@ -66,6 +67,7 @@ roadmap.md
 test_pipeline.py
 COLEGA.code-workspace
 docs/
+data/health_history.json
 
 # Tests
 tests/

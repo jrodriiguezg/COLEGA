@@ -17,5 +17,21 @@ source $VENV_PATH/bin/activate
 
 # Check for updates or other pre-start checks could go here
 
+# Fix Timezone in Distrobox
+if [ -f /etc/timezone ]; then
+    export TZ=$(cat /etc/timezone)
+fi
+
+# Fix Jack Segfaults
+export JACK_NO_START_SERVER=1
+
+# Start Mosquitto if not running and installed
+if ! pgrep -x "mosquitto" > /dev/null; then
+    if command -v mosquitto > /dev/null; then
+        echo "Iniciando Broker MQTT..."
+        mosquitto -d
+    fi
+fi
+
 # Start Application
 python NeoCore.py

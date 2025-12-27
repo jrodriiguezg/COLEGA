@@ -333,7 +333,15 @@ class SkillsService:
                         if len(output) < 150:
                             self.bus.emit('speak', {'text': f"Salida: {output}"})
                         else:
-                            self.bus.emit('speak', {'text': "Comando ejecutado. La salida es muy larga, revisa el log."})
+                            # Save to file
+                            filename = f"/home/{os.environ.get('USER', 'jrodriiguezg')}/resultado_comando.txt"
+                            try:
+                                with open(filename, 'w') as f:
+                                    f.write(output)
+                                self.bus.emit('speak', {'text': f"La salida es muy larga. La he guardado en {filename}."})
+                            except Exception as e:
+                                logger.error(f"Error executing command: {e}")
+                                self.bus.emit('speak', {'text': "Comando ejecutado, pero fallé al guardar el log."})
                     else:
                         self.bus.emit('speak', {'text': "Error en la ejecución."})
                 else:

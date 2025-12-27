@@ -526,5 +526,101 @@
             "disk": 72.6,
             "temp": "76.6\u00b0C"
         }
+    },
+    {
+        "timestamp": 1766752570.733337,
+        "date": "2025-12-26T13:36:10.733339",
+        "target": "bluetooth",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "66.2%",
+            "ram": "67.4%",
+            "disk": 72.5,
+            "temp": "97.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766752570.9101965,
+        "date": "2025-12-26T13:36:10.910198",
+        "target": "bluetooth",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "82.4%",
+            "ram": "66.7%",
+            "disk": 72.5,
+            "temp": "97.5\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766752571.0334318,
+        "date": "2025-12-26T13:36:11.033434",
+        "target": "avahi-daemon",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "71.7%",
+            "ram": "66.8%",
+            "disk": 72.5,
+            "temp": "97.4\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766752571.1746476,
+        "date": "2025-12-26T13:36:11.174650",
+        "target": "avahi-daemon",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "72.7%",
+            "ram": "66.8%",
+            "disk": 72.5,
+            "temp": "97.1\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766752715.6296844,
+        "date": "2025-12-26T13:38:35.629702",
+        "target": "bluetooth",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "59.9%",
+            "ram": "62.3%",
+            "disk": 72.5,
+            "temp": "93.9\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766752715.7905595,
+        "date": "2025-12-26T13:38:35.790562",
+        "target": "bluetooth",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "60.0%",
+            "ram": "62.4%",
+            "disk": 72.5,
+            "temp": "93.8\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766752715.912823,
+        "date": "2025-12-26T13:38:35.912826",
+        "target": "avahi-daemon",
+        "event": "CRASH_DETECTED",
+        "context": {
+            "cpu": "60.6%",
+            "ram": "62.4%",
+            "disk": 72.5,
+            "temp": "93.6\u00b0C"
+        }
+    },
+    {
+        "timestamp": 1766752716.054891,
+        "date": "2025-12-26T13:38:36.054893",
+        "target": "avahi-daemon",
+        "event": "RECOVERY_FAILED",
+        "context": {
+            "cpu": "53.5%",
+            "ram": "62.4%",
+            "disk": 72.5,
+            "temp": "93.5\u00b0C"
+        }
     }
 ]

@@ -12,13 +12,28 @@ class DockerSkill(BaseSkill):
         self.logger = logging.getLogger("DockerSkill")
 
     def consultar_estado(self, command, params, response):
-        """Lista los contenedores activos."""
-        success, output = self.core.sysadmin_manager.run_command("docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'")
+        """Lista los contenedores activos usando MANGO T5 o fallback seguro."""
+        
+        # 1. Intentar inferencia si Mango está disponible
+        cmd_to_run = None
+        if hasattr(self.core, 'mango_manager') and self.core.mango_manager:
+            mango_cmd, mango_conf = self.core.mango_manager.infer(command)
+            if mango_cmd and mango_conf > 0.6:
+                self.logger.info(f"MANGO (Docker Status) sugirió: {mango_cmd} ({mango_conf})")
+                cmd_to_run = mango_cmd
+        
+        # 2. Fallback si no hay Mango o confianza baja
+        if not cmd_to_run:
+            cmd_to_run = "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'"
+
+        # 3. Ejecutar
+        success, output = self.core.sysadmin_manager.run_command(cmd_to_run)
+        
         if success:
-            # Si hay salida, Gemma la resumirá o la leeremos tal cual
-            return f"Aquí tienes el estado de los contenedores:\n{output}"
+            # Smart Filtering se encargará de resumirlo si es largo en NeoCore
+            return f"Estado de contenedores ({cmd_to_run}):\n{output}"
         else:
-            return "No he podido consultar los contenedores. ¿Tienes Docker corriendo?"
+            return f"Error ejecutando '{cmd_to_run}'. ¿Docker está corriendo?"
 
     def accion_contenedor(self, command, params, response):
         """

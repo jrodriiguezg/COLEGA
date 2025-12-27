@@ -13,6 +13,13 @@ csrf = CSRFProtect(app)
 # Default to localhost if not set, but Configurator should set this.
 NEO_API_URL = os.environ.get('NEO_API_URL', 'http://localhost:5000')
 
+# Ensure URL has schema
+if not NEO_API_URL.startswith(('http://', 'https://')):
+    NEO_API_URL = f"http://{NEO_API_URL}"
+
+# Remove trailing slash to avoid double slashes in paths
+NEO_API_URL = NEO_API_URL.rstrip('/')
+
 def get_headers():
     """Headers for API requests (simulate login or pass API Key)."""
     # For now, we rely on the Server being open or sharing a session cookie concept if complex.

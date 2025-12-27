@@ -154,7 +154,11 @@
       "triggers": [
         "qué hora es",
         "dime la hora",
-        "tienes hora"
+        "tienes hora",
+        "oye colega qué hora es",
+        "me puedes decir la hora",
+        "qué hora tienes",
+        "hora actual"
       ],
       "action": "decir_hora_actual",
       "responses": [

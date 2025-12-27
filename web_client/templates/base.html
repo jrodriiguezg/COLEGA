@@ -18,37 +18,72 @@
 
     <style>
         :root {
-            --sidebar-width: 280px;
-            --primary-color: #3b82f6;
-            /* Modern Blue */
-            --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            --bg-dark: #0f172a;
-            --bg-glass: rgba(30, 41, 59, 0.7);
-            --border-glass: rgba(255, 255, 255, 0.08);
+            /* COSMIC THEME (Default Dark) */
+            --bg-body: #050509;
+            --bg-sidebar: #0a0a12;
+            --bg-card: rgba(18, 18, 28, 0.7);
+            --bg-hover: rgba(255, 255, 255, 0.05);
+
+            --primary: #8b5cf6;
+            /* Violet */
+            --primary-glow: rgba(139, 92, 246, 0.5);
+            --accent: #06b6d4;
+            /* Cyan */
+            --danger: #ef4444;
+            --success: #10b981;
+
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
+            --border: rgba(255, 255, 255, 0.08);
+            --gradient-sidebar: linear-gradient(180deg, rgba(139, 92, 246, 0.1) 0%, transparent 100%);
+            --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
+            --sidebar-width: 280px;
+        }
+
+        [data-theme="light"] {
+            /* LIGHT THEME (Soft Grey/Blue) */
+            --bg-body: #f1f5f9;
+            --bg-sidebar: #ffffff;
+            --bg-card: rgba(255, 255, 255, 0.9);
+            --bg-hover: rgba(0, 0, 0, 0.05);
+
+            --primary: #4f46e5;
+            /* Indigo */
+            --primary-glow: rgba(79, 70, 229, 0.3);
+            --accent: #0891b2;
+
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+
+            --border: rgba(0, 0, 0, 0.1);
+            --gradient-sidebar: linear-gradient(180deg, rgba(79, 70, 229, 0.05) 0%, transparent 100%);
+            --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
+            background-color: var(--bg-body);
             background-image:
-                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
+                radial-gradient(at 0% 0%, var(--primary-glow) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.15) 0px, transparent 50%);
             background-attachment: fixed;
             color: var(--text-main);
             overflow-x: hidden;
             min-height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* Glassmorphism Classes */
-        .glass {
-            background: var(--bg-glass);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--border-glass);
-            box-shadow: var(--shadow-glass);
+        /* Glassmorphism */
+        .glass,
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-card);
+            border-radius: 1rem;
         }
 
         /* Sidebar */
@@ -58,14 +93,13 @@
             position: fixed;
             top: 0;
             left: 0;
-            background: rgba(15, 23, 42, 0.85);
-            /* Slightly darker for contrast */
-            backdrop-filter: blur(16px);
-            border-right: 1px solid var(--border-glass);
+            background: var(--bg-sidebar);
+            background-image: var(--gradient-sidebar);
+            border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             z-index: 1000;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s;
         }
 
         .sidebar-header {
@@ -73,15 +107,15 @@
             display: flex;
             align-items: center;
             gap: 1rem;
-            border-bottom: 1px solid var(--border-glass);
-            background: linear-gradient(to right, rgba(59, 130, 246, 0.1), transparent);
+            border-bottom: 1px solid var(--border);
         }
 
         .sidebar-header h3 {
             margin: 0;
             font-weight: 800;
             font-size: 1.5rem;
-            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--text-muted) 100%);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             letter-spacing: -0.5px;
@@ -101,15 +135,15 @@
         }
 
         .nav-link:hover {
-            color: #fff;
-            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            background-color: var(--bg-hover);
             transform: translateX(4px);
         }
 
         .nav-link.active {
-            color: #fff;
-            border-left-color: var(--primary-color);
-            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%);
+            color: var(--primary);
+            border-left-color: var(--primary);
+            background: linear-gradient(90deg, var(--bg-hover) 0%, transparent 100%);
         }
 
         .nav-link i {
@@ -122,64 +156,30 @@
         .nav-link:hover i {
             transform: scale(1.1);
             opacity: 1;
+            color: var(--accent);
         }
 
         /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
-            padding: 2.5rem;
+            padding: 2rem;
             min-height: 100vh;
-            animation: fadeIn 0.5s ease-out;
+            transition: margin-left 0.3s;
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Cards */
-        .card {
-            background: var(--bg-glass);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-glass);
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            border-color: rgba(59, 130, 246, 0.3);
-        }
-
+        /* Cards & Components */
         .card-header {
-            background-color: rgba(255, 255, 255, 0.03);
-            border-bottom: 1px solid var(--border-glass);
+            background-color: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border);
             padding: 1.25rem 1.5rem;
             font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        /* Utilities */
-        .text-mono {
-            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-main);
         }
 
         .btn-primary {
-            background: var(--primary-gradient);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 150%);
             border: none;
-            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
-            font-weight: 500;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
         }
 
         .btn-primary:hover {
@@ -187,26 +187,44 @@
             transform: translateY(-1px);
         }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+        /* Forms */
+        .form-control,
+        .form-select {
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            color: var(--text-main);
         }
 
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        [data-theme="light"] .form-control,
+        [data-theme="light"] .form-select {
+            background-color: #fff;
+            color: #1e293b;
+            border-color: #cbd5e1;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: #475569;
-            border-radius: 4px;
+        .form-control:focus {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-color: var(--primary);
+            color: var(--text-main);
+            box-shadow: 0 0 0 0.25rem var(--primary-glow);
         }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
+        [data-theme="light"] .form-control:focus {
+            background-color: #fff;
+            color: #1e293b;
         }
 
-        @media (max-width: 768px) {
+        /* Tables & Lists */
+        .table {
+            color: var(--text-main);
+        }
+
+        .table-hover tbody tr:hover {
+            color: var(--text-main);
+            background-color: var(--bg-hover);
+        }
+
+        @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
             }
@@ -217,10 +235,19 @@
 
             .main-content {
                 margin-left: 0;
-                padding: 1.5rem;
+                padding: 1rem;
             }
         }
     </style>
+    {% if config.custom_css %}
+    <style>
+        {
+                {
+                config.custom_css | safe
+            }
+        }
+    </style>
+    {% endif %}
 </head>
 
 <body>
@@ -303,9 +330,25 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="h3 mb-0">{{ page|capitalize }}</h2>
                 <div class="d-flex align-items-center gap-3">
-                    <span class="badge bg-primary rounded-pill px-3 py-2 shadow-sm">v2.5</span>
+                    <!-- Audio Status Indicator -->
+                    {% if not audio_status.output %}
+                    <span class="badge bg-danger rounded-pill" title="Audio Salida Desactivado">
+                        <i class="fas fa-volume-mute"></i>
+                    </span>
+                    {% endif %}
+                    {% if not audio_status.input %}
+                    <span class="badge bg-warning text-dark rounded-pill" title="Audio Entrada Desactivado">
+                        <i class="fas fa-microphone-slash"></i>
+                    </span>
+                    {% endif %}
+
+                    <button class="btn btn-outline-secondary border-0" onclick="toggleTheme()" title="Cambiar Tema">
+                        <i class="fas fa-moon" id="theme-icon"></i>
+                    </button>
+
+                    <span class="badge bg-primary rounded-pill px-3 py-2 shadow-sm">v2.6</span>
                     <div class="dropdown">
-                        <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+                        <button class="btn btn-outline-secondary dropdown-toggle border-0" type="button"
                             data-bs-toggle="dropdown">
                             <i class="fas fa-user-circle me-2"></i> Admin
                         </button>
@@ -352,7 +395,30 @@
                 }
                 return originalFetch(input, init);
             };
+
+            // Init Theme
+            const storedTheme = localStorage.getItem('neo-theme') || 'dark';
+            setTheme(storedTheme);
         });
+
+        function toggleTheme() {
+            const current = document.body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            setTheme(current);
+        }
+
+        function setTheme(theme) {
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('neo-theme', theme);
+
+            const icon = document.getElementById('theme-icon');
+            if (theme === 'light') {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+            } else {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+            }
+        }
     </script>
 
     <script>
@@ -364,6 +430,7 @@
         });
     </script>
 
+    <!-- Fix closing tags -->
     {% block scripts %}{% endblock %}
 </body>
 

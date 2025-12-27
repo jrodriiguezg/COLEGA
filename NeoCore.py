@@ -35,17 +35,16 @@ from modules.file_manager import FileManager
 from modules.cast_manager import CastManager
 from modules.utils import load_json_data
 from modules.mqtt_manager import MQTTManager
-from modules.bluetooth_manager import BluetoothManager
-
-# --- Nuevos Managers ---
+from modules.config_manager import ConfigManager
+from modules.ai_engine import AIEngine
 from modules.voice_manager import VoiceManager
 from modules.intent_manager import IntentManager
-from modules.ai_engine import AIEngine
-from modules.chat import ChatManager
 from modules.keyword_router import KeywordRouter
+from modules.chat import ChatManager
 from modules.biometrics_manager import BiometricsManager
-from modules.mango_manager import MangoManager
-from modules.health_manager import HealthManager
+from modules.mango_manager import MangoManager # MANGO T5
+from modules.health_manager import HealthManager # Self-Healing
+from modules.bluetooth_manager import BluetoothManager
 
 # --- Módulos Opcionales ---
 try:
@@ -59,8 +58,7 @@ except ImportError:
     Brain = None
 
 try:
-    from modules.web_admin import run_server, update_face
-    WEB_ADMIN_DISPONIBLE = True
+    from modules.web_admin import run_server, update_face, set_audio_status
     WEB_ADMIN_DISPONIBLE = True
 except ImportError as e:
     app_logger.error(f"No se pudo importar Web Admin: {e}")
@@ -113,7 +111,19 @@ class NeoCore:
                 pass
 
         self.event_queue = queue.Queue()
-        self.speaker = Speaker(self.event_queue)
+        # --- Fix for Distrobox/Jack Segfaults ---
+        jack_no_start = self.config.get('audio', {}).get('jack_no_start_server', '1')
+        os.environ["JACK_NO_START_SERVER"] = str(jack_no_start)
+        # --- Audio Output (Speaker) ---
+        try:
+            self.speaker = Speaker(self.event_queue)
+            self.audio_output_enabled = True
+            self.app_logger.info("✅ Audio Output (Speaker) initialized successfully.")
+        except Exception as e:
+            self.app_logger.error(f"❌ Failed to initialize Speaker: {e}. Using Mock.")
+            self.speaker = type('MockSpeaker', (object,), {'speak': lambda self, t: self.app_logger.info(f"[MOCK SPEAK]: {t}"), 'play_random_filler': lambda self: None, 'is_busy': False})()
+            self.audio_output_enabled = False
+        
         self.config_manager = ConfigManager()
         self.config = self.config_manager.get_all()
         # --- Alias para compatibilidad con Skills ---
@@ -124,17 +134,29 @@ class NeoCore:
         self.ai_engine = AIEngine(model_path=model_path) 
         self.intent_manager = IntentManager(self.config_manager)
         self.keyword_router = KeywordRouter(self)
-        self.voice_manager = VoiceManager(
-            self.config_manager, 
-            self.speaker, 
-            self.on_voice_command,
-            update_face
-        )
+        # --- Audio Input (VoiceManager) ---
+        try:
+            self.voice_manager = VoiceManager(
+                self.config_manager, 
+                self.speaker, 
+                self.on_voice_command,
+                update_face
+            )
+            self.audio_input_enabled = True
+            self.app_logger.info("✅ Audio Input (VoiceManager) initialized successfully.")
+        except Exception as e:
+            self.app_logger.error(f"❌ Failed to initialize VoiceManager: {e}. Using Mock.")
+            self.voice_manager = type('MockVoice', (object,), {'start_listening': lambda self, i: None, 'stop_listening': lambda self: None, 'set_processing': lambda self, p: None, 'is_listening': False})()
+            self.audio_input_enabled = False
+        
+        # Update Web Admin Status
+        if WEB_ADMIN_DISPONIBLE:
+            set_audio_status(getattr(self, 'audio_output_enabled', False), getattr(self, 'audio_input_enabled', False))
+            
         self.chat_manager = ChatManager(self.ai_engine)
         self.biometrics_manager = BiometricsManager(self.config_manager)
         self.mango_manager = MangoManager() # Initialize MANGO T5
         self.health_manager = HealthManager(self.config_manager)
-
         
         # Start RAG Ingestion in background
         threading.Thread(target=self.chat_manager.knowledge_base.ingest_docs, daemon=True).start()
@@ -613,6 +635,71 @@ class NeoCore:
             if not self.speaker.is_busy:
                 self.is_processing_command = False
                 if update_face: update_face('idle')
+
+    def handle_action_result_with_chat(self, command_text, result_text):
+        """Procesa el resultado de una acción y decide cómo responder (Smart Filtering)."""
+        app_logger.info(f"Procesando resultado de acción. Longitud: {len(result_text)}")
+
+        # 1. Filtro para 'ls' / listar archivos
+        if "ls " in command_text.lower() or "listar" in command_text.lower() or "lista" in command_text.lower():
+            # Intentar contar líneas
+            lines = result_text.strip().split('\n')
+            num_files = len(lines)
+            if num_files > 5:
+                # Resumen
+                response = f"He encontrado {num_files} elementos en el directorio."
+                if num_files < 15:
+                    # Si son pocos (pero > 5), leer solo los nombres si son cortos
+                    response += " Los primeros son: " + ", ".join(lines[:3])
+                self.speak(response)
+                return
+
+        # 2. Filtro para Logs
+        if "log" in command_text.lower():
+            lines = result_text.strip().split('\n')
+            if len(lines) > 3:
+                last_lines = "\n".join(lines[-2:]) # Leer las últimas 2
+                self.speak(f"El log es largo. Aquí tienes lo último: {last_lines}")
+                return
+
+        # 3. Filtro Genérico por Longitud
+        if len(result_text) > 400:
+            # Guardar en archivo
+            filename = f"resultado_{int(time.time())}.txt"
+            filepath = os.path.join(os.getcwd(), filename)
+            try:
+                with open(filepath, 'w') as f:
+                    f.write(result_text)
+                self.speak(f"La salida es muy larga ({len(result_text)} caracteres). La he guardado en el archivo {filename}.")
+            except Exception as e:
+                self.speak("La salida es muy larga y no he podido guardarla.")
+            return
+
+        # 4. Salida Corta -> Dejar que Gemma lo explique o leerlo directo
+        # Si es muy corto, leer directo
+        if len(result_text) < 150:
+            self.speak(result_text)
+        else:
+            # Si es medio, dejar que Gemma resuma
+            try:
+                stream = self.chat_manager.get_response_stream(command_text, system_context=result_text)
+                buffer = ""
+                for chunk in stream:
+                    buffer += chunk
+                    import re
+                    parts = re.split(r'([.!?\n])', buffer)
+                    if len(parts) > 1:
+                        while len(parts) >= 2:
+                            sentence = parts.pop(0) + parts.pop(0)
+                            sentence = sentence.strip()
+                            if sentence:
+                                self.speak(sentence)
+                        buffer = "".join(parts)
+                if buffer.strip():
+                    self.speak(buffer)
+            except Exception as e:
+                app_logger.error(f"Error streaming action result: {e}")
+                self.speak("He ejecutado el comando.")
 
     def handle_unrecognized_command(self, command_text):
         """Usa Gemma para responder en Streaming."""

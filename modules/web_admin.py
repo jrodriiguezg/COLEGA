@@ -19,7 +19,7 @@ from modules.dashboard_data import DashboardDataManager
 from modules.knowledge_base import KnowledgeBase
 from modules.scheduler_manager import SchedulerManager
 
-app = Flask(__name__, template_folder='../web/templates', static_folder='../web/static')
+app = Flask(__name__, template_folder='../web_client/templates', static_folder='../web_client/static')
 
 config_manager = ConfigManager()
 
@@ -37,6 +37,18 @@ csrf = CSRFProtect(app)
 # Initialize SocketIO
 # Usamos threading para evitar conflictos con PyAudio/Threads de NeoCore
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
+
+# Global System Status
+AUDIO_STATUS = {'output': False, 'input': False}
+
+def set_audio_status(output_enabled, input_enabled):
+    global AUDIO_STATUS
+    AUDIO_STATUS['output'] = output_enabled
+    AUDIO_STATUS['input'] = input_enabled
+
+@app.context_processor
+def inject_status():
+    return dict(audio_status=AUDIO_STATUS)
 
 sys_admin = SysAdminManager()
 db = DatabaseManager()
@@ -193,6 +205,10 @@ def speech():
     """Renderiza el historial de voz."""
     return render_template('speech.html', page='speech')
 
+from modules.system_info import get_system_info
+
+# ... imports ...
+
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
@@ -226,6 +242,10 @@ def settings():
         config_manager.set('wake_word', request.form['wake_word'])
         config_manager.set('neo_ssh_enabled', 'neo_ssh_enabled' in request.form)
         
+        # Custom CSS
+        custom_css = request.form.get('custom_css', '')
+        config_manager.set('custom_css', custom_css)
+
         # Handle AI Model
         selected_model = request.form.get('ai_model')
         if selected_model:
@@ -240,10 +260,11 @@ def settings():
             current_tts['piper_model'] = full_path
             config_manager.set('tts', current_tts)
 
-        flash('Configuración guardada correctamente. Reinicia para aplicar cambios de IA.', 'success')
+        flash('Configuración guardada correctamente.', 'success')
         return redirect(url_for('settings'))
     
-    return render_template('settings.html', page='settings', config=config, voices=available_voices, models=available_models)
+    system_info = get_system_info()
+    return render_template('settings.html', page='settings', config=config, voices=available_voices, models=available_models, sys_info=system_info)
 
 @app.route('/ssh')
 @login_required
@@ -297,12 +318,29 @@ def update_face(state, data=None):
 @app.route('/api/restart', methods=['POST'])
 @login_required
 def restart_system():
-    """API para reiniciar el sistema (requiere sudo)."""
+    """API para reiniciar el servicio (o sistema si es posible)."""
     try:
-        subprocess.Popen(['sudo', 'reboot'])
-        return jsonify({'status': 'success', 'message': 'Reiniciando sistema...'})
+        # Try user service restart first (soft restart)
+        subprocess.Popen(['systemctl', '--user', 'restart', 'neo.service'])
+        return jsonify({'status': 'success', 'message': 'Reiniciando servicio Neo...'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/update', methods=['POST'])
+@login_required
+def update_system():
+    """Ejecuta git pull y reinicia el servicio."""
+    try:
+        # 1. Git Pull
+        result = subprocess.run(['git', 'pull'], capture_output=True, text=True)
+        if result.returncode != 0:
+            return jsonify({'success': False, 'message': f'Git Pull Error: {result.stderr}'})
+            
+        # 2. Restart Service
+        subprocess.Popen(['systemctl', '--user', 'restart', 'neo.service'])
+        return jsonify({'success': True, 'message': f'Actualizado correctamente. Reiniciando... \n{result.stdout}'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/stats')
 @login_required
@@ -1049,8 +1087,10 @@ def run_server():
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
     
-    host = '0.0.0.0'
-    port = 5000
+    web_config = config_manager.get('web_admin', {})
+    host = web_config.get('host', '0.0.0.0')
+    port = web_config.get('port', 5000)
+    debug_mode = web_config.get('debug', False)
     
     # Check for SSL Certs
     cert_dir = os.path.join(os.getcwd(), 'config', 'certs')
@@ -1066,4 +1106,4 @@ def run_server():
         
     print(f"🚀 Neo Web Admin running on https://{host}:{port}" if ssl_context else f"🚀 Neo Web Admin running on http://{host}:{port}")
     
-    socketio.run(app, host=host, port=port, allow_unsafe_werkzeug=True, ssl_context=ssl_context)
+    socketio.run(app, host=host, port=port, debug=debug_mode, use_reloader=False, ssl_context=ssl_context)

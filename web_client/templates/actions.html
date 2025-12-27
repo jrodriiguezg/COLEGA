@@ -2,17 +2,32 @@
 
 {% block content %}
 <div class="row g-4 mb-4">
+    <!-- Neo Update -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-info border-opacity-25 hover-card" onclick="runUpdate()" style="cursor: pointer;">
+            <div class="card-body d-flex align-items-center">
+                <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                    <i class="fas fa-cloud-download-alt fa-lg text-info"></i>
+                </div>
+                <div>
+                    <h6 class="card-subtitle mb-1 text-muted">Aplicación</h6>
+                    <h5 class="card-title mb-0">Actualizar Neo</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- System Update -->
     <div class="col-md-6 col-lg-3">
         <div class="card h-100 border-primary border-opacity-25 hover-card" onclick="runAction('update')"
             style="cursor: pointer;">
             <div class="card-body d-flex align-items-center">
                 <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                    <i class="fas fa-sync-alt fa-lg text-primary"></i>
+                    <i class="fas fa-server fa-lg text-primary"></i>
                 </div>
                 <div>
-                    <h6 class="card-subtitle mb-1 text-muted">Sistema</h6>
-                    <h5 class="card-title mb-0">Actualizar</h5>
+                    <h6 class="card-subtitle mb-1 text-muted">Sistema (OS)</h6>
+                    <h5 class="card-title mb-0">Actualizar Pkgs</h5>
                 </div>
             </div>
         </div>
@@ -102,6 +117,23 @@
             .then(res => res.json())
             .then(data => {
                 output.innerText = data.output;
+            })
+            .catch(err => {
+                output.innerHTML = `<span class="text-danger">Error: ${err}</span>`;
+            });
+    }
+
+    function runUpdate() {
+        const output = document.getElementById('action-output');
+        output.innerHTML = `<span class="text-info">Buscando actualizaciones de Neo (Git Pull)...\nEsto reiniciará el servicio si hay cambios.</span>`;
+
+        fetch('/api/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(res => res.json())
+            .then(data => {
+                output.innerText = data.message;
             })
             .catch(err => {
                 output.innerHTML = `<span class="text-danger">Error: ${err}</span>`;

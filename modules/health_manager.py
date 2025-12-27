@@ -52,15 +52,20 @@ class HealthManager:
         """Inicia el hilo de monitorización."""
         if self.running: return
         
-        # Filter services that are not installed
-        valid_services = []
-        for srv in self.monitored_services:
-            if self.sys_admin.is_service_installed(srv):
-                valid_services.append(srv)
-            else:
-                logger.info(f"ℹ️ Skipping {srv}: Service not found on system.")
-        
-        self.monitored_services = valid_services
+        # Check for systemd (Fix for Distrobox/Containers)
+        if not os.path.exists("/run/systemd/system"):
+            logger.warning("Systemd not detected (Container/Distrobox?). Disabling service auto-healing.")
+            self.monitored_services = []
+        else:
+            # Filter services that are not installed
+            valid_services = []
+            for srv in self.monitored_services:
+                if self.sys_admin.is_service_installed(srv):
+                    valid_services.append(srv)
+                else:
+                    logger.info(f"ℹ️ Skipping {srv}: Service not found on system.")
+            self.monitored_services = valid_services
+            
         logger.info(f"HealthManager checking: {self.monitored_services}")
 
         self.running = True
