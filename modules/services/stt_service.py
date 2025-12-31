@@ -81,7 +81,7 @@ class STTService:
         if model_path:
             try:
                 self.vosk_model = vosk.Model(model_path)
-                self.vosk_recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000)
+                # self.vosk_recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000) # Removed: Instantiated per request
                 logger.info("Vosk Model loaded.")
             except Exception as e:
                 logger.error(f"Failed to load Vosk: {e}")
@@ -145,20 +145,29 @@ class STTService:
         return s.result.text.strip()
 
     def transcribe_vosk(self, raw_data, rate):
-        if not self.vosk_recognizer:
+        if not self.vosk_model:
             return ""
             
-        # Feed the entire audio chunk
-        self.vosk_recognizer.AcceptWaveform(raw_data)
-        
-        # Force a final result since AudioService sends complete utterances
-        res = json.loads(self.vosk_recognizer.FinalResult())
-        text = res.get('text', '')
-        
-        if text:
-            logger.info(f"Vosk FinalResult: '{text}'")
+        try:
+            # Create a fresh recognizer for each utterance to avoid C++ state corruption/assertions
+            # This prevents "ASSERTION_FAILED (VoskAPI:TraceBackBestPath())" crashes
+            rec = vosk.KaldiRecognizer(self.vosk_model, rate)
             
-        return text
+            # Feed the entire audio chunk
+            rec.AcceptWaveform(raw_data)
+            
+            # Get result
+            res = json.loads(rec.FinalResult())
+            text = res.get('text', '')
+            
+            if text:
+                logger.info(f"Vosk FinalResult: '{text}'")
+                
+            return text
+            
+        except Exception as e:
+            logger.error(f"Vosk Transcription Error: {e}")
+            return ""
 
     def check_wake_word(self, text):
         wake_words = self.config_manager.get('wake_words', ['neo', 'tio', 'bro'])
