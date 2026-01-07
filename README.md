@@ -45,14 +45,14 @@ COLEGA is a proactive and modular personal assistant designed to run locally on 
 * **Visual Interface**: Reactive "Face" (Web UI) showing states (listening, thinking, speaking).
 * **Speech**: Natural synthesis with **Piper TTS** and offline recognition (Vosk/Whisper).
 
-#### 🛡️ Seguridad y Mantenimiento (Advanced)
+#### 🛡️ Security & Maintenance (Advanced)
 
-* **NeoGuard**: IDS (Sistema de Detección de Intrusos) que monitorea logs (`auth.log`) y recursos para detectar ataques de fuerza bruta o anomalías.
-* **Auto-Diagnóstico**: C.O.L.E.G.A. puede leer sus propios logs, encontrar errores y usar IA para explicarte qué está fallando y cómo arreglarlo.
+* **NeoGuard**: IDS (Intrusion Detection System) that monitors logs (`auth.log`) and resources to detect brute-force attacks or anomalies.
+* **Auto-Diagnosis**: C.O.L.E.G.A. can read its own logs, find errors, and use AI to explain what is failing and how to fix it.
 
 #### 🎵 Multimedia
 
-* **Audio Multi-Habitación**: Soporte para transmitir audio a dispositivos Google Cast. Pídele que ponga música en "Todos los altavoces" (Grupos de Home) o en dispositivos específicos.
+* **Multi-Room Audio**: Support for casting audio to Google Cast devices. Ask it to play music on "All speakers" (Home Groups) or specific devices.
 
 ### 🔧 Installation
 
