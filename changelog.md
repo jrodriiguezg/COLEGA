@@ -4,7 +4,7 @@ Todas las modificaciones notables en el proyecto **Neo Nano** se documentarán e
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/), y este proyecto adhiere a Versionado Semántico.
 
-## [2.5.0] - 2026-01-07 (Core Utilization & Web Polish)
+## [2.5.0-**Experimental**] - 2026-01-07 (Core Utilization & Web Polish)
 
 Versión estable optimizada específicamente para hardware de recursos limitados (i3 7th Gen / 8GB RAM) con una interfaz web pulida y robusta.
 
