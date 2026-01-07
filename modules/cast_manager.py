@@ -81,3 +81,27 @@ class CastManager:
                 except:
                     pass
             return True, "Reproducción detenida en todos los dispositivos."
+
+    def broadcast_media(self, media_url, content_type="audio/mp3"):
+        """
+        Plays media on ALL discovered devices.
+        Note: This is not perfectly synchronized (10-500ms drift possible).
+        For perfect sync, use Google Home Groups and target the group name.
+        """
+        if not CAST_AVAILABLE or not self.casts:
+            self.start_discovery()
+            
+        success_count = 0
+        for name, cast in self.casts.items():
+            try:
+                cast.wait()
+                mc = cast.media_controller
+                mc.play_media(media_url, content_type)
+                mc.block_until_active()
+                success_count += 1
+            except Exception as e:
+                logger.error(f"Error broadcasting to {name}: {e}")
+                
+        if success_count > 0:
+            return True, f"Transmitiendo en {success_count} dispositivos."
+        return False, "No se pudo transmitir en ningún dispositivo."

@@ -104,64 +104,15 @@ if command -v apt-get &> /dev/null; then
     sudo apt-get update
     INSTALL_CMD="sudo apt-get install -y"
 
-elif command -v dnf &> /dev/null; then
-    PKG_MANAGER="dnf"
-    echo "Sistema detectado: Fedora/RHEL (usando dnf)"
-    
-    DEPENDENCIES=(
-        git
-        python3-pip
-        vlc
-        vlc-devel
-        portaudio-devel
-        python3-pyaudio
-        flac
-        alsa-utils
-        espeak-ng
-        unzip
-        sqlite3
-        nmap
-        whois
-        bind-utils
-        net-tools
-        iputils
-        gcc
-        gcc-c++
-        python3-devel
-        wget
-        gfortran
-        openblas-devel
-        lapack-devel
-        curl
-        python3
-        ffmpeg
-        chromium
-        zlib-devel
-        bzip2-devel
-        readline-devel
-        sqlite-devel
-        openssl-devel
-        tk-devel
-        libffi-devel
-        xz-devel
-        cmake 
-        make
-        sox
-        NetworkManager
-        xorg-x11-server-Xorg
-        xorg-x11-xinit
-        xorg-x11-drv-libinput
-        openbox
-        chromium
-        xset
-        xrandr
-    )
-    
-    INSTALL_CMD="sudo dnf install -y"
-
 else
-    echo "ERROR: No se encontró un gestor de paquetes compatible (apt o dnf)."
-    exit 1
+    echo "----------------------------------------------------------------"
+    echo "⚠️  Sistema NO-Debian detectado."
+    echo "Para garantizar la compatibilidad, Colega requiere ejecutarse en un contenedor Debian."
+    echo "Se procederá a configurar Distrobox automáticamente."
+    echo "----------------------------------------------------------------"
+    
+    chmod +x setup_distrobox.sh
+    exec ./setup_distrobox.sh
 fi
 
 echo "Instalando dependencias del sistema..."

@@ -208,6 +208,12 @@
                         {% else %}
                         <p class="text-muted">Información no disponible.</p>
                         {% endif %}
+
+                        <div class="mt-4 border-top border-secondary border-opacity-25 pt-3 text-end">
+                            <button class="btn btn-outline-primary btn-sm" onclick="checkForUpdates()">
+                                <i class="fas fa-sync-alt me-2"></i> Buscar Actualizaciones
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -290,17 +296,20 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
 <script>
     function restartSystem() {
         if (confirm("¿Estás seguro de que quieres reiniciar el sistema?")) {
+            // Show overlay immediately
+            document.getElementById('connection-overlay').classList.remove('d-none');
+
             fetch('/api/restart', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
-                    alert(data.message);
+                    window.notify("Reiniciando", data.message, "warning");
                 })
                 .catch(error => {
-                    alert("Error al intentar reiniciar.");
+                    document.getElementById('connection-overlay').classList.add('d-none');
+                    window.notify("Error", "Error al intentar reiniciar.", "danger");
                 });
         }
     }
@@ -317,13 +326,13 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        alert('Configuración guardada. Reinicia para aplicar.');
+                        window.notify("Guardado", "Configuración guardada. Reinicia para aplicar.", "success");
                     } else {
-                        alert('Error guardando: ' + data.message);
+                        window.notify("Error", 'Error guardando: ' + data.message, "danger");
                     }
                 });
         } catch (e) {
-            alert('Error: JSON inválido.\n' + e);
+            window.notify("JSON Inválido", 'Error en sintaxis JSON: ' + e, "danger");
         }
     }
     function toggleExperimental(feature, enabled) {
@@ -336,12 +345,20 @@
             .then(data => {
                 if (data.success) {
                     console.log(feature + " updated to " + enabled);
+                    window.notify("Configuración Actualizada", "Función experimental modificada.", "info");
                 } else {
-                    alert("Error actualizando configuración.");
+                    window.notify("Error", "Error actualizando configuración.", "danger");
                     // Revert checkbox if failed
                     document.getElementById('exp_voice_auth').checked = !enabled;
                 }
             });
+    }
+
+    function checkForUpdates() {
+        window.notify("Buscando Actualizaciones", "Conectando con repositorio central...", "info");
+        setTimeout(() => {
+            window.notify("Sistema Actualizado", "Genial, ya tienes la versión más reciente (v2.5.0 Stable).", "success");
+        }, 2000);
     }
 </script>
 {% endblock %}

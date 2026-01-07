@@ -58,6 +58,10 @@ class AIEngine:
             
             self.is_ready = True
             app_logger.info(f"Modelo {os.path.basename(self.model_path)} cargado correctamente.")
+            
+            # Optimization: Free up initialization memory
+            import gc
+            gc.collect()
         except Exception as e:
             app_logger.error(f"Error cargando modelo: {e}")
             self.is_ready = False

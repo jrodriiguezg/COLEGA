@@ -35,6 +35,12 @@ else
     distrobox create -n "$CONTAINER_NAME" -i "$IMAGE" -Y
 fi
 
+# 2.5 Ensure Permissions
+echo -e "${YELLOW}Asegurando permisos del directorio de trabajo...${NC}"
+# Fix potentially root-owned files from previous sudo runs
+sudo chown -R $(id -u):$(id -g) .
+chmod -R u+rw .
+
 # 3. Enter and Setup
 echo -e "${GREEN}Instalando dependencias dentro de Distrobox...${NC}"
 
@@ -78,6 +84,22 @@ fi
 
 pip install -r requirements.txt
 
+echo '--- Descargando Modelos AI ---'
+# Create config/models dirs if needed
+if [ ! -d "models" ]; then mkdir -p models; fi
+if [ ! -d "vosk-models" ]; then mkdir -p vosk-models; fi
+
+# Run Downloaders using the container's python/venv
+echo 'Descargando Gemma...'
+python3 resources/tools/download_model.py
+
+echo 'Descargando Whisper...'
+python3 resources/tools/download_whisper_model.py
+
+echo 'Descargando MANGO (T5)...'
+# Defaulting to MANGO (Main/v1) for stability unless specified otherwise
+python3 resources/tools/download_mango_model.py --branch main
+
 echo 'Instalación Completada en Distrobox.'
 "
 
@@ -92,7 +114,73 @@ echo "distrobox enter $CONTAINER_NAME -- bash -c 'cd \"$PWD\" && source venv_dis
 chmod +x "$LAUNCHER_SCRIPT"
 
 echo -e "${GREEN}==============================================${NC}"
-echo -e "${GREEN}¡Configuración finalizada!${NC}"
-echo -e "Para iniciar la aplicación, ejecuta:"
-echo -e "${YELLOW}./$LAUNCHER_SCRIPT${NC}"
+echo -e "${GREEN}Configuración del contenedor completada.${NC}"
+
+# 5. Host-Side Configuration (Auto-Setup)
+echo -e "${YELLOW}Configurando sistema HOST...${NC}"
+
+# 5.1 Config.json
+if [ ! -f "config/config.json" ]; then
+    echo "Creando configuración por defecto..."
+    if [ ! -d "config" ]; then mkdir -p config; fi
+    echo "{}" > config/config.json
+    # We can't easily run the password helper from host if python isn't there, 
+    # but we can try running it via the container!
+    echo "Estableciendo contraseña 'admin'..."
+    distrobox enter "$CONTAINER_NAME" -- bash -c "cd \"$PWD\" && source venv_distrobox/bin/activate && python3 resources/tools/password_helper.py --user admin --password admin"
+fi
+
+# 5.2 SSL Certs
+CERT_DIR="$(pwd)/config/certs"
+if [ ! -f "$CERT_DIR/neo.key" ]; then
+    echo "Generando certificados SSL (Host)..."
+    mkdir -p "$CERT_DIR"
+    if command -v openssl >/dev/null 2>&1; then
+        openssl req -x509 -newkey rsa:4096 -keyout "$CERT_DIR/neo.key" -out "$CERT_DIR/neo.crt" -days 3650 -nodes -subj "/C=ES/ST=Madrid/L=Madrid/O=NeoCore/CN=$(hostname)"
+        chmod 600 "$CERT_DIR/neo.key"
+        chmod 644 "$CERT_DIR/neo.crt"
+        echo "✅ Certificados generados."
+    else
+        echo "⚠️ OpenSSL no encontrado en host. Se intentará generar dentro del contenedor..."
+         distrobox enter "$CONTAINER_NAME" -- bash -c "mkdir -p config/certs && openssl req -x509 -newkey rsa:4096 -keyout config/certs/neo.key -out config/certs/neo.crt -days 3650 -nodes -subj '/C=ES/ST=Madrid/L=Madrid/O=NeoCore/CN=NeoBox'"
+    fi
+fi
+
+# 5.3 Systemd Service (User Mode)
+echo "Configurando servicio systemd (User)..."
+SERVICE_DIR="$HOME/.config/systemd/user"
+mkdir -p "$SERVICE_DIR"
+SERVICE_FILE="$SERVICE_DIR/neo.service"
+PROJECT_DIR="$(pwd)"
+LAUNCHER_PATH="$PROJECT_DIR/$LAUNCHER_SCRIPT"
+
+cat <<EOT > "$SERVICE_FILE"
+[Unit]
+Description=Neo Assistant Service (Distrobox Mode)
+After=network.target sound.target
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=$PROJECT_DIR
+ExecStart=$LAUNCHER_PATH
+Restart=always
+RestartSec=10
+SyslogIdentifier=neo_distrobox
+
+[Install]
+WantedBy=default.target
+EOT
+
+# Reload and Enable
+echo "Habilitando servicio..."
+systemctl --user daemon-reload
+systemctl --user enable neo.service
+systemctl --user restart neo.service
+loginctl enable-linger $(whoami)
+
+echo -e "${GREEN}==============================================${NC}"
+echo -e "${GREEN}¡Instalación COMPLETADA!${NC}"
+echo -e "NeoCore se está ejecutando en segundo plano (dentro de Distrobox)."
+echo -e "Logs: journalctl --user -u neo.service -f"
 echo -e "${GREEN}==============================================${NC}"

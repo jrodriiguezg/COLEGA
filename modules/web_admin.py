@@ -90,6 +90,8 @@ def add_security_headers(response):
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com;"
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
 
 # Simple in-memory Login Rate Limiter
@@ -175,17 +177,7 @@ def dashboard():
     """Renderiza el dashboard principal."""
     return render_template('dashboard.html', page='dashboard')
 
-@app.route('/services')
-@login_required
-def services():
-    """Renderiza la página de gestión de servicios."""
-    return render_template('services.html', page='services')
 
-@app.route('/docker')
-@login_required
-def docker_page():
-    """Renderiza la página de gestión de Docker."""
-    return render_template('docker.html', page='docker')
 
 @app.route('/tasks')
 @login_required
@@ -473,19 +465,7 @@ def api_speech_history():
         })
     return jsonify(data)
 
-@app.route('/api/services', methods=['GET'])
-@login_required
-def api_services():
-    """API que devuelve el estado de los servicios."""
-    return jsonify(sys_admin.get_services())
 
-@app.route('/api/services/control', methods=['POST'])
-@login_required
-def api_control_service():
-    """API para controlar servicios (start/stop/restart)."""
-    data = request.json
-    success, msg = sys_admin.control_service(data.get('name'), data.get('action'))
-    return jsonify({'success': success, 'message': msg})
 
 @app.route('/api/network', methods=['GET'])
 @login_required
@@ -701,66 +681,7 @@ def api_ssh_delete():
         return jsonify({'success': True})
     return jsonify({'success': False, 'message': 'Servidor no encontrado'})
 
-# --- DOCKER API ---
 
-@app.route('/api/docker/containers', methods=['GET'])
-@login_required
-def api_docker_containers():
-    """Devuelve la lista de contenedores Docker."""
-    # Usamos format json de docker ps
-    # Referencia: docker ps --format '{{json .}}'
-    # Pero sysadmin.run_command devuelve string.
-    # Mejor parsear nosotros o usar libreria docker.
-    # Vamos a usar CLI para no añadir dependencia 'docker' python library si no es crítica.
-    
-    cmd = "docker ps -a --format '{{json .}}'"
-    success, output = sys_admin.run_command(cmd)
-    
-    if not success:
-         return jsonify([])
-         
-    containers = []
-    # Output es linea a linea json objects
-    for line in output.strip().split('\n'):
-        if line:
-            try:
-                containers.append(json.loads(line))
-            except:
-                pass
-                
-    return jsonify(containers)
-
-@app.route('/api/docker/logs', methods=['POST'])
-@login_required
-def api_docker_logs():
-    """Devuelve logs de un contenedor."""
-    container = request.json.get('id')
-    lines = request.json.get('lines', 100)
-    
-    if not container:
-        return jsonify({'success': False, 'message': 'Container ID missing'})
-        
-    cmd = f"docker logs --tail {lines} {container}"
-    success, output = sys_admin.run_command(cmd)
-    
-    # Docker logs often go to stderr
-    # run_command returns stdout+stderr combined which is good.
-    return jsonify({'logs': output})
-
-@app.route('/api/docker/control', methods=['POST'])
-@login_required
-def api_docker_control():
-    """Start/Stop/Restart container."""
-    container = request.json.get('id')
-    action = request.json.get('action') # start, stop, restart
-    
-    if action not in ['start', 'stop', 'restart']:
-        return jsonify({'success': False, 'message': 'Invalid action'})
-        
-    cmd = f"docker {action} {container}"
-    success, output = sys_admin.run_command(cmd)
-    
-    return jsonify({'success': success, 'message': output})
 
     return jsonify({'success': False, 'message': 'Servidor no encontrado'})
 
@@ -965,7 +886,9 @@ def api_dashboard_layout():
 @login_required
 def api_files_list():
     """Lista directorio."""
-    path = request.json.get('path', '/')
+    path = request.json.get('path')
+    if not path:
+        path = os.path.expanduser('~') # Default to HOME instead of /
     success, items = file_manager.list_directory(path)
     if success:
         return jsonify({'success': True, 'items': items})

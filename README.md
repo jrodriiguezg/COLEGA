@@ -1,83 +1,70 @@
-# COLEGA (v2.5.0-testing)
-
+# COLEGA (v2.5.0-stable)
+ 
 [🇺🇸 English](#english) | [🇪🇸 Español](#español)
-
+ 
 ---
-
+ 
 <a name="english"></a>
 ## English
-
+ 
 > [!WARNING]
-> **Testing Branch**: You are currently viewing the development version (v2.5.0-testing). Features like Self-Healing and MANGO T5 are experimental and might be unstable. Use at your own risk.
-
+> **Beta Stability**: This release (v2.5.0) is on the `main` branch but is considered **Experimental**. While feature-complete, you may encounter bugs or instability as we optimize the new Core V4 architecture. Report issues on GitHub!
+ 
 **C.O.L.E.G.A.** (Language Copilot for Group and Administration Environments)
-
-> Formerly known as **OpenKompai Nano**
-
+ 
 COLEGA is a proactive and modular personal assistant designed to run locally on modest hardware. It combines the efficiency of a rule-based system for system control and home automation with the intelligence of a local LLM (**Gemma 2B**) for natural conversations and reasoning.
-
-![Status](https://img.shields.io/badge/Status-Testing-orange)
+ 
+![Status](https://img.shields.io/badge/Status-Beta-yellow)
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![License](https://img.shields.io/badge/License-GPLv3-green)
-
-### 🌟 New in v2.5.0 (Testing Branch)
-
-*   **🛡️ Self-Healing System**: Proactive "HealthManager" module that detects crashed services (`cron`, `mosquitto`, `nginx`, etc.) and automatically attempts to restart them. It also performs predictive analysis based on system load.
-*   **🥭 SysAdmin AI (MANGO T5)**: Specialized 770M parameter model fine-tuned to translate natural language into `bash` commands. Use **MANGO2** (default) for advanced capabilities or swap to the stable **MANGO** version during installation.
-*   **🔍 Smart Service Discovery**: Automatically detects which services are installed on the host machine to avoid false alerts.
-*   **📅 Cron Automation**: New task scheduler and Web UI to manage system jobs with cron syntax.
+ 
+### 🌟 New in v2.5.0 (Stable)
+ 
+*   **⚡ Core V2.5 (Optimization)**: Deep internal optimization for dual-core CPUs (i3).
+    *   **Thread Watchdog**: Self-healing for internal processes (Voice, Events).
+    *   **Resource Tuning**: Strict PyTorch threading limits to prevent audio stuttering.
+*   **🖥️ Web Interface V3**:
+    *   **Drag-and-Drop Dashboard**: Customize your workspace with persistent layouts.
+    *   **Unified Notifications**: Replaced browser alerts with a modern Toast system + Desktop Notifications.
+    *   **Connection Monitor**: Full-screen overlay that automatically detects system restarts/outages.
+    *   **About & Updates**: Dedicated section for version management.
+*   **🥭 SysAdmin AI (MANGO T5)**: Robust translation of natural language to Bash commands.
 
 ### 🚀 Key Features
 
 #### 🧠 Hybrid Intelligence
-*   **Local LLM**: Integration with **Gemma 2B** (4-bit) for fluid conversations, personality, and complex reasoning without cloud dependency.
+*   **Local LLM**: Integration with **Gemma 2B** (4-bit) for fluid conversations.
 *   **SysAdmin AI**: **MANGO T5** model for robust Natural Language to Bash translation.
-*   **Memory (Brain)**: Long-term memory system and alias learning for commands.
-*   **RAG (Retrieval-Augmented Generation)**: Ability to query documents and learned data to enrich responses.
+*   **Memory (Brain)**: Long-term memory system and alias learning.
+*   **RAG (Retrieval-Augmented Generation)**: Query local documents.
 
 #### 🗣️ Natural Interaction
-*   **Voice**: Offline voice recognition with **Vosk** (fast) or **Whisper** (accurate).
-*   **Speech**: Natural and emotive speech synthesis with **Piper TTS**.
-*   **Visual Interface**: Reactive "Face" (Web UI) showing states (listening, thinking, speaking) and notifications.
+*   **Visual Interface**: Reactive "Face" (Web UI) showing states (listening, thinking, speaking).
+*   **Speech**: Natural synthesis with **Piper TTS** and offline recognition (Vosk/Whisper).
 
-#### 🛠️ System & Network Administration
-*   **SysAdmin**: Service control, system updates, resource monitoring (CPU/RAM/Disk), and power management.
-*   **SSH Manager**: SSH connection manager to administer remote servers via voice.
-*   **Network Tools**: Network scanning (Nmap), Ping, Whois, and public IP detection.
+#### 🛡️ Seguridad y Mantenimiento (Advanced)
+*   **NeoGuard**: IDS (Sistema de Detección de Intrusos) que monitorea logs (`auth.log`) y recursos para detectar ataques de fuerza bruta o anomalías.
+*   **Auto-Diagnóstico**: C.O.L.E.G.A. puede leer sus propios logs, encontrar errores y usar IA para explicarte qué está fallando y cómo arreglarlo.
 
-### 🏗️ Architecture
+#### 🎵 Multimedia
+*   **Audio Multi-Habitación**: Soporte para transmitir audio a dispositivos Google Cast. Pídele que ponga música en "Todos los altavoces" (Grupos de Home) o en dispositivos específicos.
 
-The core (`NeoCore.py`) orchestrates several independent modules:
+### 🔧 Installation
 
-*   **Managers**: `VoiceManager`, `IntentManager`, `AIEngine`, `HealthManager` (New), `MangoManager` (New).
-*   **Skills**: Specific functional modules (`skills/system`, `skills/network`, `skills/media`, etc.).
-
-### 🔧 Installation (Testing Branch)
-
-**Recommended Native Installation:** (Best for System Control & Self-Healing)
+**Recommended Native Installation:**
 
 ```bash
-# Clone the repository and switch to testing branch
+# Clone the repository
 git clone https://github.com/jrodriiguezg/COLEGA.git
 cd COLEGA
-git checkout testing && git pull
 
-# Run the native installer (User Service Mode)
-# This will download MANGO T5 (prompts for version), Vosk, Piper, and set up the systemd service.
+# Run the installer
 ./install.sh
 ```
 
 ### ⚙️ Configuration
-
-The main configuration is found in `config/config.json`.
-*   **Wake Word**: Activation word (default "tio", "colega", etc.).
-*   **Preferences**: Language, TTS voice, listening sensitivity.
-
-### 🖥️ Usage
-
-Once installed, COLEGA will run as a background service.
-*   **Logs**: `journalctl --user -u neo.service -f`
-*   **Web Interface**: Access `http://localhost:5000/face`
+Main configuration: `config/config.json`.
+Access the Web Interface at `http://localhost:5000`.
 
 ---
 
@@ -85,67 +72,57 @@ Once installed, COLEGA will run as a background service.
 ## Español
 
 > [!WARNING]
-> **Rama Testing**: Estás viendo la versión de desarrollo (v2.5.0-testing). Funcionalidades como Self-Healing y MANGO T5 son experimentales y podrían ser inestables. Úsalo bajo tu propia responsabilidad.
+> **Estabilidad Beta**: Esta versión (v2.5.0) está en la rama `main` pero se considera **Experimental**. Aunque es funcional, puedes encontrar errores mientras pulimos la nueva arquitectura del Core V4. ¡Reporta fallos en GitHub!
 
 **C.O.L.E.G.A.** (COpiloto de Lenguaje para Entornos de Grupo y Administración)
 
-> Anteriormente conocido como **OpenKompai Nano**
+COLEGA es un asistente personal proactivo y modular diseñado para ejecutarse localmente.
 
-COLEGA es un asistente personal proactivo y modular diseñado para ejecutarse localmente en hardware modesto. Combina la eficiencia de un sistema basado en reglas para el control del sistema y domótica, con la inteligencia de un LLM local (**Gemma 2B**) para conversaciones naturales y razonamiento.
-
-![Status](https://img.shields.io/badge/Status-Testing-orange)
+![Status](https://img.shields.io/badge/Status-Beta-yellow)
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![License](https://img.shields.io/badge/License-GPLv3-green)
 
-### 🌟 Novedades en v2.5.0 (Rama Testing)
+### 🌟 Novedades en v2.5.0 (Stable)
 
-*   **🛡️ Sistema Self-Healing**: Módulo "HealthManager" proactivo que detecta servicios caídos (`cron`, `mosquitto`, `nginx`, etc.) e intenta reiniciarlos automáticamente. También realiza análisis predictivo basado en la carga del sistema.
-*   **🥭 SysAdmin AI (MANGO T5)**: Modelo especializado de 770M parámetros ajustado para traducir lenguaje natural a comandos `bash`. Usa **MANGO2** (por defecto) para capacidades avanzadas o elige la versión estable **MANGO** durante la instalación.
-*   **🔍 Smart Service Discovery**: Detecta automáticamente qué servicios están instalados en la máquina host para evitar falsas alertas.
-*   **📅 Automatización Cron**: Nueva interfaz Web y gestor para programar tareas del sistema usando sintaxis cron.
+*   **⚡ Core V2.5 (Optimización)**: Optimización interna profunda para CPUs de doble núcleo (i3).
+    *   **Thread Watchdog**: Sistema de "autocuración" para procesos internos (Voz, Eventos).
+    *   **Ajuste de Recursos**: Limitación estricta de hilos PyTorch para evitar cortes de audio.
+*   **🖥️ Interfaz Web V2.2**:
+    *   **Dashboard Personalizable**: Organiza los widgets con **Drag-and-Drop** (se guarda solo).
+    *   **Notificaciones Unificadas**: Sistema de Toasts moderno + Notificaciones de Escritorio.
+    *   **Monitor de Conexión**: Overlay a pantalla completa que detecta reinicios del servidor automáticamente.
+    *   **Actualizaciones**: Nueva sección "About" para gestión de versiones.
+*   **🥭 SysAdmin AI (MANGO T5)**: Traducción robusta de comandos.
 
 ### 🚀 Características Principales
 
 #### 🧠 Inteligencia Híbrida
-*   **LLM Local**: Integración con **Gemma 2B** (4-bit) para conversaciones fluidas, personalidad y razonamiento complejo sin depender de la nube.
-*   **SysAdmin AI**: Modelo **MANGO T5** para una traducción robusta de Lenguaje Natural a Bash.
-*   **Memoria (Brain)**: Sistema de memoria a largo plazo y aprendizaje de alias para comandos.
-*   **RAG**: Capacidad de consultar documentos locales.
+*   **LLM Local**: **Gemma 2B** para conversaciones.
+*   **SysAdmin AI**: **MANGO T5** para comandos Bash.
+*   **Memoria (Brain)**: Memoria a largo plazo y RAG.
 
 #### 🗣️ Interacción Natural
 *   **Voz**: Reconocimiento offline con **Vosk** o **Whisper**.
 *   **Habla**: Síntesis natural con **Piper TTS**.
 *   **Interfaz Visual**: "Cara" reactiva que muestra estados del asistente.
 
+#### 🛡️ Advanced Capabilities
+*   **NeoGuard**: Monitor de seguridad en tiempo real.
+*   **Auto-Diagnóstico**: Análisis de logs asistido por IA.
+*   **Multi-Room**: Control de dispositivos Cast.
+
 #### 🛠️ Administración de Sistemas & Redes
-*   **SysAdmin**: Control de servicios, actualizaciones, monitoreo de recursos y gestión de energía.
-*   **SSH Manager**: Administración de servidores remotos por voz.
-*   **Network Tools**: Escaneo de red, Ping, Whois, IP pública.
 
-### 🔧 Instalación (Rama Testing)
+### 🔧 Instalación
 
-**Instalación Nativa Recomendada:** (Ideal para control total del sistema y Self-Healing)
+**Instalación Nativa Recomendada:**
 
 ```bash
-# Clonar y cambiar a rama testing
 git clone https://github.com/jrodriiguezg/COLEGA.git
 cd COLEGA
-git checkout testing && git pull
-
-# Ejecutar instalador nativo (Modo Servicio de Usuario)
-# Esto descargará MANGO T5 (solicita versión), Vosk, Piper y configurará systemd.
 ./install.sh
 ```
 
-### ⚙️ Configuración
-
-Archivo principal: `config/config.json`.
-*   **Wake Word**: Palabra de activación ("tio", "colega").
-*   **Preferencias**: Idioma, voz TTS, sensibilidad.
-
 ### 🖥️ Uso
-
-COLEGA funciona como servicio en segundo plano:
+*   **Interfaz Web**: `http://localhost:5000`
 *   **Logs**: `journalctl --user -u neo.service -f`
-*   **Interfaz Web**: `http://localhost:5000/face`
-*   **Comandos**: *"Colega, reinicia el servidor nginx"*, *"Colega, busca vulnerabilidades en la red"*.

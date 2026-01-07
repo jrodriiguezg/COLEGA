@@ -28,14 +28,11 @@ from modules.skills.docker import DockerSkill
 from modules.skills.diagnosis import DiagnosisSkill
 from modules.ssh_manager import SSHManager
 from modules.wifi_manager import WifiManager
-from modules.wifi_manager import WifiManager
 # from modules.vision import VisionManager # Lazy load to prevent CV2 segfaults
-from modules.file_manager import FileManager
 from modules.file_manager import FileManager
 from modules.cast_manager import CastManager
 from modules.utils import load_json_data
 from modules.mqtt_manager import MQTTManager
-from modules.config_manager import ConfigManager
 from modules.ai_engine import AIEngine
 from modules.voice_manager import VoiceManager
 from modules.intent_manager import IntentManager
@@ -45,6 +42,8 @@ from modules.biometrics_manager import BiometricsManager
 from modules.mango_manager import MangoManager # MANGO T5
 from modules.health_manager import HealthManager # Self-Healing
 from modules.bluetooth_manager import BluetoothManager
+import threading
+import time
 
 # --- Módulos Opcionales ---
 try:
@@ -75,8 +74,6 @@ try:
 except ImportError:
     Guard = None
 
-
-
 try:
     from modules.sherlock import Sherlock
 except ImportError:
@@ -97,7 +94,7 @@ class NeoCore:
     def __init__(self):
         # --- Asignar Logger al objeto para que los Skills lo usen ---
         self.app_logger = app_logger
-        self.app_logger.info("Iniciando Neo Core (AIEngine Edition)...")
+        self.app_logger.info("Iniciando Neo Core (System v2.5.0 - Optimized)...")
 
         try:
             locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
@@ -109,6 +106,9 @@ class NeoCore:
                 locale.setlocale(locale.LC_TIME, '')
             except:
                 pass
+
+        self.config_manager = ConfigManager()
+        self.config = self.config_manager.get_all()
 
         self.event_queue = queue.Queue()
         # --- Fix for Distrobox/Jack Segfaults ---
@@ -124,8 +124,6 @@ class NeoCore:
             self.speaker = type('MockSpeaker', (object,), {'speak': lambda self, t: self.app_logger.info(f"[MOCK SPEAK]: {t}"), 'play_random_filler': lambda self: None, 'is_busy': False})()
             self.audio_output_enabled = False
         
-        self.config_manager = ConfigManager()
-        self.config = self.config_manager.get_all()
         # --- Alias para compatibilidad con Skills ---
         self.skills_config = self.config.get('skills', {})
         
@@ -159,14 +157,14 @@ class NeoCore:
         self.health_manager = HealthManager(self.config_manager)
         
         # Start RAG Ingestion in background
-        threading.Thread(target=self.chat_manager.knowledge_base.ingest_docs, daemon=True).start()
+        self._rag_thread = threading.Thread(target=self.chat_manager.knowledge_base.ingest_docs, daemon=True, name="RAG_Ingest")
+        self._rag_thread.start()
 
         # --- Legacy Managers ---
         self.calendar_manager = CalendarManager()
         self.alarm_manager = AlarmManager()
         self.sysadmin_manager = SysAdminManager() if SysAdminManager else None
         self.ssh_manager = SSHManager()
-        self.wifi_manager = WifiManager()
         self.wifi_manager = WifiManager()
         
         # Vision (Optional & Disabled by default to prevent Segfaults)
@@ -204,7 +202,6 @@ class NeoCore:
              self.app_logger.warning("No se ha podido vincular self.db (Brain DB Manager). FilesSkill podría fallar.")
         
         # --- Chat Manager (Personality & History) ---
-        self.chat_manager = ChatManager(self.ai_engine)
         self.chat_manager.brain = self.brain # Inject Brain for RAG
         
         self.network_manager = NetworkManager() if NetworkManager else None
@@ -227,7 +224,6 @@ class NeoCore:
         self.skills_content = ContentSkill(self)
         self.skills_organizer = OrganizerSkill(self)
         self.skills_ssh = SSHSkill(self)
-        self.skills_files = FilesSkill(self)
         self.skills_files = FilesSkill(self)
         self.skills_docker = DockerSkill(self)
         self.skills_diagnosis = DiagnosisSkill(self)
@@ -252,7 +248,6 @@ class NeoCore:
 
         self.pending_mango_command = None # For confirming potentially dangerous shell commands
         
-        
         self.waiting_for_learning = None # Stores the key we are trying to learn
         self.pending_suggestion = None # Stores the ambiguous intent we are asking about
 
@@ -260,13 +255,58 @@ class NeoCore:
         self.last_intent_name = None
         self.active_listening_end_time = 0 
 
+        # --- Thread Handles ---
+        self._thread_events = None
+        self._thread_proactive = None
+        self._thread_web = None
+
         self.start_background_tasks()
         
         try:
             while True:
-                time.sleep(1)
+                time.sleep(10)
+                self._watchdog_check()
         except KeyboardInterrupt:
             self.on_closing()
+
+    def _watchdog_check(self):
+        """Monitor critical threads and restart them if necessary."""
+        # 1. Event Queue Thread
+        if self._thread_events and not self._thread_events.is_alive():
+            app_logger.critical("⚠ Event Queue Thread died! Restarting...")
+            self._thread_events = threading.Thread(target=self.process_event_queue, daemon=True, name="Events_Loop")
+            self._thread_events.start()
+
+        # 2. Proactive Thread
+        if self._thread_proactive and not self._thread_proactive.is_alive():
+            app_logger.warning("⚠ Proactive Thread died! Restarting...")
+            self._thread_proactive = threading.Thread(target=self.proactive_update_loop, daemon=True, name="Proactive_Loop")
+            self._thread_proactive.start()
+
+        # Web Admin is managed by Flask internal server, bit harder to restart cleanly from here without re-import, 
+        # but usually it doesn't crash silently.
+
+    def start_background_tasks(self):
+        """Inicia los hilos en segundo plano."""
+        # 1. Escucha de voz
+        self.voice_manager.start_listening(self.intent_manager.intents)
+        
+        # 2. Procesamiento de eventos (hablar, acciones)
+        self._thread_events = threading.Thread(target=self.process_event_queue, daemon=True, name="Events_Loop")
+        self._thread_events.start()
+        
+        # 3. Tareas proactivas (alarmas, etc)
+        self._thread_proactive = threading.Thread(target=self.proactive_update_loop, daemon=True, name="Proactive_Loop")
+        self._thread_proactive.start()
+
+        # 4. Web Admin (si está disponible)
+        if WEB_ADMIN_DISPONIBLE:
+            self._thread_web = threading.Thread(target=run_server, daemon=True, name="Web_Server")
+            self._thread_web.start()
+            app_logger.info("Servidor Web Admin iniciado en segundo plano.")
+
+        # 5. Self-Healing
+        self.health_manager.start()
 
     def on_vision_event(self, event_type, data):
         """Callback for vision events."""
@@ -301,25 +341,6 @@ class NeoCore:
         if self.health_manager:
             self.health_manager.stop()
         os._exit(0)
-
-    def start_background_tasks(self):
-        """Inicia los hilos en segundo plano."""
-        # 1. Escucha de voz
-        self.voice_manager.start_listening(self.intent_manager.intents)
-        
-        # 2. Procesamiento de eventos (hablar, acciones)
-        threading.Thread(target=self.process_event_queue, daemon=True).start()
-        
-        # 3. Tareas proactivas (alarmas, etc)
-        threading.Thread(target=self.proactive_update_loop, daemon=True).start()
-
-        # 4. Web Admin (si está disponible)
-        if WEB_ADMIN_DISPONIBLE:
-            threading.Thread(target=run_server, daemon=True).start()
-            app_logger.info("Servidor Web Admin iniciado en segundo plano.")
-
-        # 5. Self-Healing
-        self.health_manager.start()
 
     def on_voice_command(self, command, wake_word):
         """Callback cuando VoiceManager detecta voz."""

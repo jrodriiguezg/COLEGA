@@ -59,14 +59,22 @@ class MangoManager:
                 self.device = "cuda"
             else:
                 self.device = "cpu"
+                # OPTIMIZATION: Limit PyTorch threads to 1 or 2 on dual-core CPUs (i3)
+                # to prevent starving the audio/voice threads.
+                torch.set_num_threads(1)
+                torch.set_num_interop_threads(1)
                 
-            logger.info(f"Usando dispositivo: {self.device}")
+            logger.info(f"Usando dispositivo: {self.device} (Optimized for Multi-tasking)")
 
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
             self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path).to(self.device)
             
             self.is_ready = True
             logger.info("MANGO T5 cargado correctamente.")
+            
+            # Memory Cleanup
+            import gc
+            gc.collect()
 
         except Exception as e:
             logger.error(f"Error cargando MANGO T5: {e}", exc_info=True)
