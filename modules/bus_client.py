@@ -80,7 +80,8 @@ class BusClient:
         """Connect to the bus."""
         url = f"http://{self.host}:{self.port}"
         try:
-            self.sio.connect(url)
+            # Force polling because server is running in threading mode (no websockets)
+            self.sio.connect(url, transports=['polling'])
         except Exception as e:
             logger.error(f"Connection failed: {e}")
 
