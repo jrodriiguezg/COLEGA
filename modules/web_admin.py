@@ -39,8 +39,8 @@ app.secret_key = secret_key
 csrf = CSRFProtect(app)
 
 # Initialize SocketIO
-# Usamos threading para evitar conflictos con PyAudio/Threads de NeoCore
-socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
+# Usamos eventlet para WebSockets robustos (requiere pip install eventlet)
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 # Global System Status
 AUDIO_STATUS = {'output': False, 'input': False}

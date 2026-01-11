@@ -24,8 +24,7 @@
         }
 
         body {
-            background-color: #222;
-            /* Dark Grey Debug Mode */
+            background-color: var(--bg);
             margin: 0;
             height: 100vh;
             width: 100vw;
@@ -406,11 +405,7 @@
 </head>
 
 <body class="idle">
-    <div id="debug-msg"
-        style="position:absolute; top:10px; left:10px; color:red; z-index:9999; font-size:24px; font-weight:bold;">
-        DEBUG: SYSTEM ONLINE. WAITING FOR SERVER... <br>
-        (Si ves esto, Chromium funciona OK)
-    </div>
+
 
     <div class="container">
         <!-- Face Section -->
@@ -455,12 +450,7 @@
             reconnection: true
         });
 
-        socket.on('connect', () => {
-            document.getElementById('debug-msg').style.display = 'none';
-            document.body.style.backgroundColor = '#000'; // Set Black on Connect
-            console.log("Connected to server successfully");
-        });
-        });
+
 
         const body = document.body;
         const statusText = document.getElementById('status-text');
