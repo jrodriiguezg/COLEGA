@@ -415,7 +415,7 @@ class NeoCore:
     def handle_command(self, command_text):
         """Procesa el comando de texto."""
         try:
-            try:
+
                 # Diálogos activos
                 if self.waiting_for_timer_duration:
                     self.handle_timer_duration_response(command_text)
@@ -434,34 +434,6 @@ class NeoCore:
                     self.handle_mango_confirmation(command_text)
                     return
 
-    def handle_mango_confirmation(self, text):
-        """Confirma o cancela un comando de sistema propuesto por Mango."""
-        command = self.pending_mango_command
-        self.pending_mango_command = None # Reset state
-
-        if any(w in text.lower() for w in ['sí', 'si', 'hazlo', 'dale', 'ejecuta', 'vale', 'ok']):
-            self.speak("Ejecutando.")
-            
-            # Execute command
-            try:
-                import subprocess
-                result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=30)
-                output = result.stdout.strip() or result.stderr.strip()
-                if output:
-                    # Limitar salida hablada
-                    spoken_output = output[:200]
-                    self.speak(f"Resultado: {spoken_output}")
-                else:
-                    self.speak("Comando terminado sin salida.")
-            except Exception as e:
-                self.speak(f"Error al ejecutar: {e}")
-                
-        else:
-            self.speak("Vale, cancelado.")
-                if self.pending_mango_command:
-                    self.handle_mango_confirmation(command_text)
-                    return
-
                 if self.waiting_for_learning:
                     self.handle_learning_response(command_text)
                     return
@@ -470,6 +442,48 @@ class NeoCore:
                     return
 
                 # --- 0. FACE LEARNING (Priority High) ---
+                import re
+                match_learn = re.search(r"(?:soy|me llamo|mi nombre es)\s+(.+)", command_text, re.IGNORECASE)
+                if match_learn:
+                    name = match_learn.group(1).strip()
+                    if self.vision_manager:
+                         # Logic to learn face would go here
+                         pass
+
+                # --- 1. COMMAND EXECUTION (Priority 1) ---
+                # Try to execute via Action Map
+                result = self.execute_command(command_text)
+                if result:
+                    # Comprobar si result es un stream de texto (generator)
+                    if hasattr(result, '__iter__') and not isinstance(result, (str, bytes, dict)):
+                        # Streaming response
+                        try:
+                             buffer = ""
+                             for chunk in result:
+                                 if chunk:
+                                     buffer += chunk
+                                     # Heuristic: speak on sentence boundaries
+                                     if any(punct in buffer for punct in ['.', '!', '?', '\n']):
+                                          import re
+                                          # Split keeping delimiters
+                                          parts = re.split(r'([.!?\n])', buffer)
+                                          
+                                          if len(parts) > 1:
+                                              while len(parts) >= 2:
+                                                  sentence = parts.pop(0) + parts.pop(0)
+                                                  sentence = sentence.strip()
+                                                  if sentence:
+                                                      self.speak(sentence)
+                                                      
+                                              buffer = "".join(parts)
+                             # Speak remaining
+                             if buffer.strip():
+                                 self.speak(buffer)
+                        except Exception as e:
+                              app_logger.error(f"Error streaming action result: {e}")
+                              self.speak("He hecho lo que pediste, pero me he liado al contártelo.")
+                    return
+
                 # Check for "Soy {name}" or "Aprende mi cara"
                 import re
                 match_learn = re.search(r"(?:soy|me llamo|mi nombre es)\s+(.+)", command_text, re.IGNORECASE)
@@ -531,13 +545,13 @@ class NeoCore:
                 
                 # --- Context Injection (Simplified) ---
                 # User Request: "Contexto: ['archivo1', 'archivo2'] | Instrucción: Borra la foto"
-                try:
-                    # List files in current directory (excluding hidden ones for noise reduction)
-                    files_in_cwd = [f for f in os.listdir('.') if not f.startswith('.')]
-                    # Limit list size to avoid token overflow
                 # --- Context Optimization ---
                 # Exclude hidden files and common noise
-                raw_files = os.listdir('.')
+                try:
+                    raw_files = os.listdir('.')
+                except:
+                    raw_files = []
+                    
                 ignored = {'.git', '__pycache__', 'venv', 'env', '.config', 'node_modules', '.gemini'}
                 
                 filtered_files = [
@@ -749,9 +763,9 @@ class NeoCore:
                 
 
 
-            except Exception as e:
-                app_logger.error(f"Error CRÍTICO en handle_command: {e}", exc_info=True)
-                self.speak("Ha ocurrido un error interno procesando tu comando.")
+        except Exception as e:
+            app_logger.error(f"Error CRÍTICO en handle_command: {e}", exc_info=True)
+            self.speak("Ha ocurrido un error interno procesando tu comando.")
 
         finally:
             if not self.speaker.is_busy:
@@ -1071,6 +1085,31 @@ class NeoCore:
             self.speak("No tengo cerebro disponible para guardar eso.")
         
         self.waiting_for_learning = None
+
+    def handle_mango_confirmation(self, text):
+        """Confirma o cancela un comando de sistema propuesto por Mango."""
+        command = self.pending_mango_command
+        self.pending_mango_command = None # Reset state
+
+        if any(w in text.lower() for w in ['sí', 'si', 'hazlo', 'dale', 'ejecuta', 'vale', 'ok']):
+            self.speak("Ejecutando.")
+            
+            # Execute command
+            try:
+                import subprocess
+                result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=30)
+                output = result.stdout.strip() or result.stderr.strip()
+                if output:
+                    # Limitar salida hablada
+                    spoken_output = output[:200]
+                    self.speak(f"Resultado: {spoken_output}")
+                else:
+                    self.speak("Comando terminado sin salida.")
+            except Exception as e:
+                self.speak(f"Error al ejecutar: {e}")
+                
+        else:
+            self.speak("Vale, cancelado.")
 
 if __name__ == "__main__":
     app = NeoCore()
