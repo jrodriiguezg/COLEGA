@@ -168,44 +168,74 @@ class VoiceManager:
         return None
 
     def on_audio_data(self, message):
-        """Procesa audio recibido del bus (AudioService)."""
-        if not self.is_listening or self.is_processing:
-            return
-
-        try:
-            payload = message.get('data', {})
-            b64_data = payload.get('data')
-            if b64_data and self.vosk_model:
-                # Initialize recognizer if needed (lazy init)
-                if not hasattr(self, 'recognizer') or self.recognizer is None:
-                     self.recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000)
-                
-                audio_data = base64.b64decode(b64_data)
-                
-                if self.recognizer.AcceptWaveform(audio_data):
-                    result = json.loads(self.recognizer.Result())
-                    command = result.get('text', '')
-                    if command:
-                        ww = self._check_wake_word(command)
-                        self.on_command_detected(command, ww if ww else 'neo')
-        except Exception as e:
-            app_logger.error(f"Error processing bus audio: {e}")
+        """Callback placeholder (Bus mode disabled for now)."""
+        pass
 
     def _continuous_voice_listener(self, intents):
-        """Bucle principal de escucha (Legacy Local PyAudio)."""
-        # En arquitectura distribuida/bus, este método no debería bloquear ni usar PyAudio local
-        # si ya tenemos AudioService enviando datos.
-        # Por seguridad, si llega aquí y usa Vosk, inicializamos el reconocedor para usarlo en el callback
-        if not self.vosk_model:
-             return
+        """Bucle principal de escucha de voz (Local PyAudio)."""
+        try:
+            stt_config = self.config_manager.get('stt', {})
+            stt_engine = stt_config.get('engine', 'vosk')
+            
+            if not self.vosk_model:
+                vosk_logger.error("Modelo Vosk no cargado. No se puede iniciar escucha.")
+                return
 
-        if not hasattr(self, 'recognizer') or self.recognizer is None:
-             self.recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000)
-             
-        app_logger.info("VoiceManager en modo BUS/PASIVO. Esperando eventos 'recognizer_loop:audio'...")
-        # No abrimos PyAudio local para evitar conflictos con AudioService
-        while self.is_listening:
-            time.sleep(1) # Keep thread alive just in case logic depends on it, but do nothing
+            # Init Recognizer
+            if not hasattr(self, 'recognizer') or self.recognizer is None:
+                use_grammar = self.config_manager.get('stt', {}).get('use_grammar', True)
+                if use_grammar and intents:
+                    grammar = self.get_grammar(intents)
+                    self.recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000, grammar)
+                else:
+                    self.recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000)
+
+            app_logger.info("Starting Local PyAudio Stream (VoiceManager)...")
+            
+            with no_alsa_error():
+                p = pyaudio.PyAudio()
+                device_index = self.config_manager.get('stt', {}).get('input_device_index', None)
+                stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, 
+                                frames_per_buffer=4096, input_device_index=device_index)
+                stream.start_stream()
+                
+            last_face_update = 0
+            
+            while self.is_listening:
+                 # Pause logic
+                 if self.speaker.is_busy or self.is_processing:
+                     time.sleep(0.1)
+                     continue
+                     
+                 try:
+                     data = stream.read(4096, exception_on_overflow=False)
+                     if self.recognizer.AcceptWaveform(data):
+                         result = json.loads(self.recognizer.Result())
+                         command = result.get('text', '')
+                         if command:
+                             ww = self._check_wake_word(command)
+                             self.on_command_detected(command, ww if ww else 'neo')
+                     else:
+                         # Partial
+                         partial = json.loads(self.recognizer.PartialResult())
+                         if partial.get('partial') and self.update_face:
+                             current_time = time.time()
+                             if current_time - last_face_update > 0.5:
+                                 self.update_face('listening')
+                                 last_face_update = current_time
+                                 
+                 except Exception as e:
+                     vosk_logger.error(f"Error reading audio stream: {e}")
+                     time.sleep(0.5)
+
+            # Cleanup
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+
+        except Exception as e:
+            app_logger.error(f"Critical Error in Voice Loop: {e}")
+
 
 
 
