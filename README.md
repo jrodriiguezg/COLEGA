@@ -17,7 +17,7 @@ COLEGA is a proactive and modular personal assistant designed to run locally on 
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![License](https://img.shields.io/badge/License-GPLv3-green)
 
-### 🌟 New in v2.5.0 (Stable)
+### 🌟 New in v2.5.0 (Experimental)
 
 * **⚡ Core V2.5 (Optimization)**: Deep internal optimization for dual-core CPUs (i3).
   * **Thread Watchdog**: Self-healing for internal processes (Voice, Events).
