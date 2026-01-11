@@ -1086,7 +1086,33 @@ class NeoCore:
         
         self.waiting_for_learning = None
 
-    def handle_mango_confirmation(self, text):
+    def execute_command(self, command_text):
+        """Intenta ejecutar un comando usando los diferentes gestores (Intent, Keyword, etc)."""
+        # 1. Intent Manager (NLP)
+        intent = self.intent_manager.detect_intent(command_text)
+        if intent and intent['confidence'] > 0.7:
+             app_logger.info(f"Intent detectado: {intent['intent']} ({intent['confidence']})")
+             # Aquí iría la lógica de ejecución de intents, por ahora devolvemos respuesta simple o delegamos
+             # En la versión refactorizada, NeoCore delegaba esto.
+             # Para simplificar: si hay intent, podríamos mapearlo a una acción.
+             # Pero dado que el refactor es complejo, usaremos el KeywordRouter como fallback principal
+             pass # TODO: Implementar ejecución completa de intents si es necesario
+
+        # 2. Keyword Router (Comandos directos)
+        router_response = self.keyword_router.process(command_text)
+        if router_response:
+             app_logger.info(f"Keyword Router ejecutó: {command_text}")
+             if isinstance(router_response, str):
+                 self.speak(router_response)
+             return router_response
+
+        # 3. System Admin Actions (si no fue capturado por router)
+        if self.sysadmin_manager:
+             # Check for common system phrases
+             pass
+
+        return None
+
         """Confirma o cancela un comando de sistema propuesto por Mango."""
         command = self.pending_mango_command
         self.pending_mango_command = None # Reset state
