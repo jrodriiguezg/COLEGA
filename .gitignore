@@ -68,6 +68,7 @@ test_pipeline.py
 COLEGA.code-workspace
 docs/
 data/health_history.json
+resources/tools/diagnose.sh
 
 # Tests
 tests/
