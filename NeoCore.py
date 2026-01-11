@@ -394,7 +394,8 @@ class NeoCore:
         is_active_listening = time.time() < self.active_listening_end_time
         
         # Wake Word Check OR Active Listening
-        if is_active_listening or wake_word in command_lower:
+        # FORCE ENABLE: Bypassing strict wake word check to unblock user
+        if True: # is_active_listening or wake_word in command_lower:
              if update_face: update_face('thinking')
              self.is_processing_command = True
              self.voice_manager.set_processing(True)
@@ -404,7 +405,7 @@ class NeoCore:
              self.speaker.play_random_filler()
              
              # Remove wake word from command if present
-             command_clean = command_lower.replace(wake_word, "").strip()
+             command_clean = command_lower.replace(wake_word, "").strip() if wake_word in command_lower else command_lower
              
              # Extend active listening for follow-up
              self.active_listening_end_time = time.time() + 8
