@@ -27,7 +27,7 @@ COLEGA is a proactive and modular personal assistant designed to run locally on 
   * **Unified Notifications**: Replaced browser alerts with a modern Toast system + Desktop Notifications.
   * **Connection Monitor**: Full-screen overlay that automatically detects system restarts/outages.
   * **About & Updates**: Dedicated section for version management.
-* **🥭 SysAdmin AI (MANGOT5)[https://huggingface.co/jrodriiguezg/mango-t5-770m]**: Robust translation of natural language to Bash commands.
+* **🥭 SysAdmin AI ([MANGOT5](https://huggingface.co/jrodriiguezg/mango-t5-770m))**: Robust translation of natural language to Bash commands.
 
 ### 🚀 Key Features
 
