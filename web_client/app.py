@@ -53,7 +53,11 @@ def login():
             # We actually need an API /login which returns a cookie or token.
             # NeoCore currently uses a standard form login.
             # Let's try to POST to /login on server and capture the cookie.
-            resp = requests.post(f"{NEO_API_URL}/login", data={'username': username, 'password': password}, allow_redirects=False)
+            # Disable warnings for self-signed certs
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
+            resp = requests.post(f"{NEO_API_URL}/login", data={'username': username, 'password': password}, allow_redirects=False, verify=False)
             
             if resp.status_code == 302 and 'dashboard' in resp.headers['Location']:
                 # Success
@@ -120,7 +124,7 @@ def settings():
     # Fetch content from API
     try:
         headers, cookies = get_headers()
-        resp = requests.get(f"{NEO_API_URL}/api/config/get", cookies=cookies)
+        resp = requests.get(f"{NEO_API_URL}/api/config/get", cookies=cookies, verify=False)
         data = resp.json()
         return render_template('settings.html', page='settings', config=data.get('config',{}), voices=data.get('voices',[]), models=data.get('models',[]))
     except Exception as e:
@@ -142,7 +146,7 @@ def knowledge():
 def skills():
     try:
         headers, cookies = get_headers()
-        resp = requests.get(f"{NEO_API_URL}/api/skills", cookies=cookies)
+        resp = requests.get(f"{NEO_API_URL}/api/skills", cookies=cookies, verify=False)
         return render_template('skills.html', page='skills', config=resp.json())
     except:
         return render_template('skills.html', page='skills', config={})
@@ -152,7 +156,7 @@ def training():
     # Training usually needs config too for TTS/STT options logic
     try:
         headers, cookies = get_headers()
-        resp = requests.get(f"{NEO_API_URL}/api/config/get", cookies=cookies)
+        resp = requests.get(f"{NEO_API_URL}/api/config/get", cookies=cookies, verify=False)
         data = resp.json()
         return render_template('training.html', page='training', config=data.get('config', {}))
     except:
@@ -171,13 +175,13 @@ def api_proxy(path):
     
     try:
         if request.method == 'GET':
-            resp = requests.get(url, params=request.args, cookies=cookies)
+            resp = requests.get(url, params=request.args, cookies=cookies, verify=False)
         elif request.method == 'POST':
             # Forward JSON or Form data
             if request.is_json:
-                resp = requests.post(url, json=request.json, cookies=cookies)
+                resp = requests.post(url, json=request.json, cookies=cookies, verify=False)
             else:
-                resp = requests.post(url, data=request.form, files=request.files, cookies=cookies)
+                resp = requests.post(url, data=request.form, files=request.files, cookies=cookies, verify=False)
         
         # Check if response is json
         try:
