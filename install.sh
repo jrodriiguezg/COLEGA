@@ -443,6 +443,15 @@ else
 fi
 echo ""
 
+# --- 4.5. DESCARGA DEL MODELO VOSK (LARGE) ---
+echo "[PASO 4.5/5] Instalando modelo Vosk Large (Mejor precisión)..."
+if [ -f "resources/tools/install_vosk_large.py" ]; then
+    $VENV_DIR/bin/python resources/tools/install_vosk_large.py
+else
+    echo "ERROR: No se encontró resources/tools/install_vosk_large.py"
+fi
+echo ""
+
 # --- 5. CONFIGURACIÓN DEL SERVICIO SYSTEMD (USER MODE) ---
 echo "[PASO 5/5] Configurando el servicio systemd (Modo Usuario)..."
 

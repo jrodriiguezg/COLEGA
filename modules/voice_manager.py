@@ -42,15 +42,30 @@ class VoiceManager:
     def setup_vosk(self):
         """Carga el modelo de reconocimiento de voz Vosk."""
         if VOSK_DISPONIBLE:
-            model_path = self.config_manager.get('stt', {}).get('model_path', "vosk-models/es")
+            # Resolve absolute path relative to project root (assuming run from project root or finding it)
+            # Default fallback
+            config_path = self.config_manager.get('stt', {}).get('model_path', "vosk-models/es")
+            
+            # Try to resolve absolute path
+            if not os.path.isabs(config_path):
+                # Assume 2 levels up from modules/voice_manager.py is project root? 
+                # Or just use os.getcwd() if we trust setup. But simpler to use os.path.abspath
+                model_path = os.path.abspath(config_path)
+            else:
+                model_path = config_path
+
+            app_logger.info(f"DEBUG: Attempting to load Vosk model from: {model_path}")
+
             if os.path.isdir(model_path):
                 try:
                     self.vosk_model = vosk.Model(model_path)
                     vosk_logger.info(f"Modelo Vosk cargado desde: {model_path}")
                 except Exception as e:
                     vosk_logger.error(f"Error al cargar modelo Vosk: {e}")
+                    app_logger.error(f"DEBUG: Error al cargar modelo Vosk: {e}")
             else:
                 vosk_logger.warning(f"Modelo Vosk no encontrado en '{model_path}'.")
+                app_logger.warning(f"DEBUG: Modelo Vosk no encontrado en '{model_path}'. CWD: {os.getcwd()}")
 
     def setup_whisper(self):
         """Carga el modelo Faster-Whisper."""
@@ -142,33 +157,35 @@ class VoiceManager:
 
     def _continuous_voice_listener(self, intents):
         """Bucle principal de escucha de voz."""
-        stt_config = self.config_manager.get('stt', {})
-        stt_engine = stt_config.get('engine', 'vosk') # Default to vosk
-        app_logger.info(f"DEBUG: Listening thread running. Engine: {stt_engine} | Raw Config: {stt_config}")
-        
-        if stt_engine == 'sherpa':
-            self._sherpa_listener()
-            return
-
-        # Disable Whisper for now as implementation is missing (causing crash loop)
-        # if stt_engine == 'whisper' and self.whisper_model:
-        #    self._whisper_listener()
-        #    return
-
-        if not self.vosk_model:
-            vosk_logger.error("Modelo Vosk no cargado. No se puede iniciar escucha.")
-            return
-
-        app_logger.info("DEBUG: Vosk model present. initializing recognizer...")
-        use_grammar = self.config_manager.get('stt', {}).get('use_grammar', True)
-        
-        if use_grammar and intents:
-            grammar = self.get_grammar(intents)
-            recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000, grammar)
-        else:
-            recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000)
+        try:
+            stt_config = self.config_manager.get('stt', {})
+            stt_engine = stt_config.get('engine', 'vosk') # Default to vosk
+            app_logger.info(f"DEBUG: Listening thread running. Engine: {stt_engine} | Raw Config: {stt_config}")
             
-        app_logger.info("DEBUG: Recognizer initialized. Starting PyAudio...")
+            if stt_engine == 'sherpa':
+                self._sherpa_listener()
+                return
+
+            if not self.vosk_model:
+                vosk_logger.error("Modelo Vosk no cargado. No se puede iniciar escucha.")
+                app_logger.error("DEBUG: Modelo Vosk no cargado (listener guard hit).")
+                return
+
+            app_logger.info("DEBUG: Vosk model present. initializing recognizer...")
+            use_grammar = self.config_manager.get('stt', {}).get('use_grammar', True)
+            
+            if use_grammar and intents:
+                grammar = self.get_grammar(intents)
+                recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000, grammar)
+            else:
+                recognizer = vosk.KaldiRecognizer(self.vosk_model, 16000)
+                
+            app_logger.info("DEBUG: Recognizer initialized. Starting PyAudio...")
+        except Exception as e:
+            import traceback
+            app_logger.error(f"CRITICAL ERROR in voice listener initialization: {e}")
+            app_logger.error(traceback.format_exc())
+            return
             
         with no_alsa_error():
             p = pyaudio.PyAudio()
