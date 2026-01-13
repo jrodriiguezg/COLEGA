@@ -37,6 +37,7 @@ class VoiceManager:
         self.whisper_model = None
         self.is_listening = False
         self.is_processing = False # Flag to pause listening during processing
+        self.is_muted = False # Mute flag
         
         self.setup_vosk()
         self.setup_whisper()
@@ -44,6 +45,8 @@ class VoiceManager:
         # --- BUS CLIENT ---
         self.bus = BusClient(name="VoiceManager")
         self.bus.on('recognizer_loop:audio', self.on_audio_data)
+        self.bus.on('mic:toggle', self.on_mic_toggle)
+        self.bus.on('mic:get_status', self.on_mic_get_status)
         # self.bus.connect() <-- Deadlock Fix: Let run_forever handle it in thread
         # Start bus thread
         threading.Thread(target=self.bus.run_forever, daemon=True).start()
@@ -171,6 +174,16 @@ class VoiceManager:
         """Callback placeholder (Bus mode disabled for now)."""
         pass
 
+    def on_mic_toggle(self, message):
+        """Toggle mute state."""
+        self.is_muted = not self.is_muted
+        app_logger.info(f"Microphone Muted: {self.is_muted}")
+        self.bus.emit('mic:status', {'muted': self.is_muted})
+
+    def on_mic_get_status(self, message):
+        """Emit current status."""
+        self.bus.emit('mic:status', {'muted': self.is_muted})
+
     def _continuous_voice_listener(self, intents):
         """Bucle principal de escucha de voz (Local PyAudio)."""
         try:
@@ -203,7 +216,7 @@ class VoiceManager:
             
             while self.is_listening:
                  # Pause logic
-                 if self.speaker.is_busy or self.is_processing:
+                 if self.speaker.is_busy or self.is_processing or self.is_muted:
                      time.sleep(0.1)
                      continue
                      
