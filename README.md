@@ -1,4 +1,4 @@
-# COLEGA (v2.5.0-Experimental)
+# NEOPapaya (v2.5.0-Experimental)
 
 [🇺🇸 English](#english) | [🇪🇸 Español](#español)
 
@@ -9,7 +9,7 @@
 > [!WARNING]
 > **Beta Stability**: This release (v2.5.0) is on the `main` branch but is considered **Experimental**. While feature-complete, you may encounter bugs or instability as we optimize the new Core V2.5 architecture. Report issues on GitHub!
 
-**C.O.L.E.G.A.** (Language Copilot for Group and Administration Environments)
+
 
 COLEGA is a proactive and modular personal assistant designed to run locally on modest hardware. It combines the efficiency of a rule-based system for system control and home automation with the intelligence of a local LLM (**Gemma 2B**) for natural conversations and reasoning.
 
@@ -81,7 +81,6 @@ Access the Web Interface at `http://localhost:5000`.
 > [!WARNING]
 > **Estabilidad Beta**: Esta versión (v2.5.0) está en la rama `main` pero se considera **Experimental**. Aunque es funcional, puedes encontrar errores mientras pulimos la nueva arquitectura del Core V2,5. ¡Reporta fallos en GitHub!
 
-**C.O.L.E.G.A.** (COpiloto de Lenguaje para Entornos de Grupo y Administración)
 
 COLEGA es un asistente personal proactivo y modular diseñado para ejecutarse localmente.
 
